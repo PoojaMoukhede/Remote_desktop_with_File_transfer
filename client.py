@@ -117,7 +117,7 @@ def recv_and_put_into_queue(client_socket, jpeg_queue):
 
     try:
         while True:
-            msg = connection.receive_data(client_socket, header_size, partial_prev_msg)
+            msg = connection.data_recive(client_socket, header_size, partial_prev_msg)
             if msg:
                 jpeg_queue.put(lz4.frame.decompress(msg[0]))  # msg[0]--> new msg
                 partial_prev_msg = msg[1]  # msg[1]--> partial_prev_msg
@@ -205,8 +205,8 @@ def remote_display():
     print("Sending start_capture message")
     connection.send_data(command_server_socket, COMMAND_HEADER_SIZE, bytes("start_capture", "utf-8"))
     print("Sent start_capture message")
-    disable_choice = messagebox.askyesno("Remote Box", "Disable the remote computer wallpaper?(yes recommended)")
-    # disable_choice = connection.retry("Disable the remote computer wallpaper?(recommended):")
+    disable_choice = messagebox.askyesno("Remote Box", "Disable the remote Devicewallpaper?(yes recommended)")
+    # disable_choice = connection.retry("Disable the remote Devicewallpaper?(recommended):")
 
     # remote display socket
     remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -218,13 +218,12 @@ def remote_display():
     print(f">>You can now CONTROL the remote desktop now")
     resize_option = False
     server_width, server_height = ImageGrab.grab().size
-    client_resolution = connection.receive_data(remote_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
+    client_resolution = connection.data_recive(remote_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
     client_width, client_height = client_resolution.split(",")
 
     display_width, display_height = compare_and_compute_resolution(int(client_width), int(client_height), server_width,
                                                                    server_height)
-    # display_msg = bytes(str(display_width) + "," + str(display_height), "utf-8")
-    # connection.send_data(clientsocket, 2, display_msg)
+
     if (client_width, client_height) != (display_width, display_height):
         resize_option = True
 
@@ -271,35 +270,23 @@ def login():
             command_server_socket.connect((server_ip, server_port))
             server_pass = bytes(server_pass, "utf-8")
             connection.send_data(command_server_socket, 2, server_pass)  # send password
-            login_response = connection.receive_data(command_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
+            login_response = connection.data_recive(command_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
 
             if login_response != "1":
                 print("WRONG Password!..")
             else:
-                # chat socket
-                chat_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                chat_server_socket.connect((server_ip, server_port))
-
-                # file transfer socket
-                file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                file_server_socket.connect((server_ip, server_port))
-
                 print("\n")
                 print("Connected to the remote computer!")
-                #label_status.configure(state='normal')
+
                 label_status.grid()
                 execute = False
 
                 thread1 = Thread(target=listen_for_commands, daemon=True)
                 thread1.start()
-                # thread for chat
-                # recv_chat_msg_thread = Thread(target=receive_chat_message, name="recv_chat_msg_thread", daemon=True)
-                # recv_chat_msg_thread.start()
+
 
                 # Enable
                 disconnect_button.configure(state="normal")
-                # my_notebook.add(chat_frame, text=" Chat ")
-                # my_notebook.add(file_transfer_frame, text=" File Transfer ")
                 access_button_frame.grid(row=7, column=0, padx=45, pady=20, columnspan=2, sticky=tk.W + tk.E)
                 # Disable
                 name_entry.configure(state="disabled")
@@ -308,7 +295,6 @@ def login():
                 connect_button.configure(state="disabled")
 
         except OSError as e:
-            #label_status.configure(state='disabled')
             label_status.grid_remove()
             print(e.strerror)
     else:
@@ -337,19 +323,18 @@ def disconnect(caller):
 
     # Disable
     disconnect_button.configure(state="disabled")
-    #label_status.configure(state='disabled')
     label_status.grid_remove()
 
     access_button_frame.grid_forget()
-    my_notebook.hide(1)
-    my_notebook.hide(2)
+    my_screen.hide(1)
+    my_screen.hide(2)
 
 
 def listen_for_commands():
     listen = True
     try:
         while listen:
-            msg = connection.receive_data(command_server_socket, COMMAND_HEADER_SIZE, bytes(), 1024)[0].decode("utf-8")
+            msg = connection.data_recive(command_server_socket, COMMAND_HEADER_SIZE, bytes(), 1024)[0].decode("utf-8")
             if msg == "disconnect":
                 listen = False
     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
@@ -360,303 +345,9 @@ def listen_for_commands():
         if (file_window is not None) and file_window.winfo_exists():
             file_window.destroy()
             print("top window destroyed")
-        #label_status.configure(state='disabled')
         label_status.grid_remove()
         disconnect("message")
         print("Thread1 automatically exits")
-
-
-def add_text_chat_display_widget(msg, name):
-    text_chat_widget.configure(state=tk.NORMAL)
-    text_chat_widget.insert(tk.END, "\n")
-    text_chat_widget.insert(tk.END, name + ": " + msg)
-    text_chat_widget.configure(state="disabled")
-
-
-# def send_chat_message(event):
-#     try:
-#         msg = input_text_widget.get()
-#         if msg and msg.strip() != "":
-#             input_text_widget.delete(0, "end")
-#             connection.send_data(chat_server_socket, CHAT_HEADER_SIZE, bytes(msg, "utf-8"))
-#             add_text_chat_display_widget(msg, LOCAL_CHAT_NAME)
-#     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
-#         print(e.strerror)
-
-
-# def receive_chat_message():
-#     try:
-#         while True:
-#             msg = connection.receive_data(chat_server_socket, CHAT_HEADER_SIZE, bytes())[0].decode("utf-8")
-#             add_text_chat_display_widget(msg, REMOTE_CHAT_NAME)
-#     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
-#         print(e.strerror)
-#     except ValueError:
-#         pass
-
-
-# def upload_file(filename):
-#     # needs the location of the file to upload
-#     file_size = os.stat(filename).st_size
-#     connection.send_data(file_server_socket, FILE_HEADER_SIZE, bytes(str(file_size), "utf-8"))
-#     file_mode = "r" if (len(filename) > 4) and (filename[len(filename) - 4:] == ".txt") else "rb"
-#     client_file_mode = "w" if file_mode == "r" else "wb"
-#     connection.send_data(file_server_socket, FILE_HEADER_SIZE, bytes(client_file_mode, "utf-8"))
-#     data = True
-#     with open(filename, file_mode) as f:
-#         while data:
-#             if file_mode == "r":
-#                 data = bytes(f.read(65536), "utf-8")
-#             elif file_mode == "rb":
-#                 data = f.read(65536)
-#             if data:
-#                 connection.send_data(file_server_socket, FILE_HEADER_SIZE, data)
-
-
-# def file_explore(system_name):
-#     # global LOCAL_PATH
-#     system_values = system_choice.get(system_name)
-#     if system_name == "local":
-#         try:
-#             # scan the current path to get the path details
-#             obj = os.scandir(system_values[2])
-#         except PermissionError:
-#             print("No permission to access this resource")
-#             back_button("restore_prev_path", system_name)
-#             return
-#     else:
-#         pass
-#     count = 0
-#     for entry in obj:
-#         if entry.is_dir() or entry.is_file():
-#             st = entry.stat()
-#             # modification datetime
-#             mod = datetime.fromtimestamp(st.st_mtime).strftime("%d-%m-%Y %I:%M %p")
-#             if entry.is_dir():
-#                 typ = "File folder"
-#                 size = ""
-#                 update_treeview(system_values[0], count, folder_img, (entry.name, typ, size, mod))
-#                 count += 1
-#             else:
-#                 typ = "File"
-#                 # get the extension of file to define the file type and icon of the file
-#                 match = re.search(r"\.(\w+)$", entry.name)
-#                 display_img = file_img
-#                 if match:
-#                     ext = match.group(1)
-#                     if ext.lower() == "pdf":
-#                         display_img = pdf_img
-#                     elif ext.lower() == "exe":
-#                         display_img = exe_img
-#                     elif ext.lower() in ("jpg", "png", "bmp", "gif", "tiff"):
-#                         display_img = photo_img
-#                     elif ext.lower() == "txt":
-#                         display_img = txt_img
-#                     elif ext.lower() in ("doc", "docx", "docm"):
-#                         display_img = word_img
-#                     elif ext.lower() in ("ppt", "pptx", "pptm"):
-#                         display_img = powerpoint_img
-#                     elif ext.lower() in ("xlsx", "xlsm"):
-#                         display_img = excel_img
-#                     elif ext.lower() in ("mp4", "mov", "wmv", "flv", "avi", "mkv"):
-#                         display_img = video_img
-#                     elif ext.lower() in ("3gp", "mp3", "wav", "webm", "m4a"):
-#                         display_img = music_img
-#                     elif ext.lower() in ("zip", "7z", "rar", "tar", "iso", "gz", "sfx", "apk"):
-#                         display_img = zip_img
-#                     typ = ext.upper() + " " + typ
-
-#                 # Get the appropriate size
-#                 if st.st_size < 1024:
-#                     size = str(st.st_size) + " bytes"
-#                 elif st.st_size < 1048576:
-#                     size = str(round(st.st_size / 1024, 1)) + " KB"
-#                 elif st.st_size < 1073741824:
-#                     size = str(round(st.st_size / (1024 * 1024), 1)) + " MB"
-#                 else:
-#                     size = str(round(st.st_size / (1024 * 1024 * 1024), 1)) + " GB"
-
-#                 # insert data into the treeview
-#                 update_treeview(system_values[0], count, display_img, (entry.name, typ, size, mod))
-#                 count += 1
-
-#     system_values[1].delete(0, tk.END)
-#     system_values[1].insert(0, system_values[2].replace(r"\\", "\\"))
-
-
-def drive_letters(system_name):
-    system_values = system_choice.get(system_name)
-    drives = win32api.GetLogicalDriveStrings()
-    drives = tuple(drives.split(':\\\000')[:-1])
-    for i in range(0, len(drives)):
-        update_treeview(system_values[0], i, drive_img, (drives[i], "Drive", "", ""))
-
-
-# def back_button(event, system_name):
-#     # global LOCAL_PATH
-#     # list of directories excluding 2 elements i.e the empty string and the last directory
-#     system_values = system_choice.get(system_name)
-#     li_of_dir = system_values[2].split(r"\\")[:-2]
-#     if li_of_dir:
-#         system_choice.get(system_name)[2] = r""
-#         # joining each element of list with "\\" to form the new path
-#         for name in li_of_dir:
-#             system_choice.get(system_name)[2] += name + r"\\"
-#         if event == "button":
-#             file_explore(system_name)
-#     else:
-#         # clear the local path displayed
-#         system_values[1].delete(0, tk.END)
-#         drive_letters(system_name)
-
-
-# def change_path(event=None, system_name=None):
-#     # global LOCAL_PATH, REMOTE_PATH
-#     system_values = system_choice.get(system_name)
-#     items = system_values[0].selection()
-#     if len(items) == 1:
-#         col_values = system_values[0].item(items[0], 'values')
-#         print(f"Selection : {col_values[0]}")
-#         if col_values[1] == "File folder" or col_values[1] == "Drive":
-#             if col_values[1] == "Drive":
-#                 system_choice.get(system_name)[2] = col_values[0] + r":\\"
-#             elif col_values[1] == "File folder":
-#                 system_choice.get(system_name)[2] += col_values[0] + r"\\"
-#             print(f"Changing path to : {system_choice.get(system_name)[2]}")  # for i in items:
-#             file_explore(system_name)
-
-
-# def update_treeview(file_tree, iid, img, value):
-#     if iid == 0:
-#         file_tree.delete(*file_tree.get_children())
-#     file_tree.insert(parent="", index="end", iid=iid, text="", image=img, values=value)
-
-
-# def recv_file_details(files_details_queue):
-#     recv = True
-#     partial_prev_msg = bytes()
-#     try:
-#         while recv:
-#             msg = connection.receive_data(browse_file_server_socket, FILE_HEADER_SIZE, partial_prev_msg)
-#             if msg:
-#                 files_details_queue.put(lz4.frame.decompress(msg[0]))  # msg[0]--> new msg
-#                 partial_prev_msg = msg[1]                              # msg[1]--> partial_prev_msg
-#     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
-#         print(e.strerror)
-#     except ValueError:
-#         pass
-#     finally:
-#         print("recv_file_details_process automatically exits")
-
-
-# def local_file_treeview():
-#     global local_file_tree, local_path_entry
-
-#     local_top_file_frame = tk.LabelFrame(file_window, bd=0)
-#     local_top_file_frame.grid(row=0, column=0, sticky=tk.W + tk.E, padx=10, pady=10)
-
-#     local_file_frame = tk.LabelFrame(file_window, bd=0)
-#     local_file_frame.grid(row=1, column=0, sticky=tk.W + tk.E, padx=10)
-
-#     # path entry field
-#     local_path_entry = tk.Entry(local_top_file_frame, width=45)
-#     local_path_entry.configure(font=("Helvetica", 11, "bold"))
-#     local_path_entry.grid(row=0, column=1, columnspan=2, sticky=tk.W + tk.E)
-
-#     # scrollbar
-#     local_scroll_file_widget = tk.Scrollbar(local_file_frame)
-#     local_scroll_file_widget.grid(row=1, column=1, sticky=tk.N + tk.S)
-
-#     # Treeview
-#     local_file_tree = ttk.Treeview(local_file_frame, yscrollcommand=local_scroll_file_widget.set)
-
-#     local_scroll_file_widget.configure(command=local_file_tree.yview)
-#     # defining the columns
-#     local_file_tree["columns"] = ("Name", "Type", "Size", "Modified")
-
-#     # formatting the columns
-#     local_file_tree.column("#0", width=50, minwidth=50, anchor=tk.W, stretch=tk.NO)
-#     local_file_tree.column("Name", anchor=tk.W, width=130, minwidth=60)
-#     local_file_tree.column("Type", anchor=tk.W, width=100, minwidth=50)
-#     local_file_tree.column("Size", anchor=tk.CENTER, width=80, minwidth=40)
-#     local_file_tree.column("Modified", anchor=tk.W, width=80, minwidth=40)
-
-#     # Heading of columns
-#     local_file_tree.heading("#0", text="", anchor=tk.W)
-#     local_file_tree.heading("Name", text="Name", anchor=tk.W)
-#     local_file_tree.heading("Type", text="Type", anchor=tk.W)
-#     local_file_tree.heading("Size", text="Size", anchor=tk.CENTER)
-#     local_file_tree.heading("Modified", text="Modified", anchor=tk.W)
-
-#     # local back button
-#     local_prev_dir_button = tk.Button(local_top_file_frame, bd=0, image=back_img,
-#                                       command=lambda: back_button("button", "local"))
-#     local_prev_dir_button.grid(row=0, column=0, sticky=tk.W, padx=10)
-
-#     local_path_entry.insert(0, LOCAL_PATH)
-
-#     tree_style = ttk.Style()
-#     tree_style.configure('Treeview', rowheight=40)
-#     local_file_tree.bind("<Double-1>", lambda event: change_path(event, system_name="local"))
-#     local_file_tree.grid(row=1, column=0, pady=10, sticky=tk.W + tk.E)
-
-#     system_choice["local"][0] = local_file_tree
-#     system_choice["local"][1] = local_path_entry
-
-
-# def remote_file_treeview():
-#     global remote_file_tree, remote_path_entry
-
-#     remote_top_file_frame = tk.LabelFrame(file_window, bd=0)
-#     remote_top_file_frame.grid(row=0, column=1, sticky=tk.W + tk.E, padx=10, pady=10)
-
-#     remote_file_frame = tk.LabelFrame(file_window, bd=0)
-#     remote_file_frame.grid(row=1, column=1, sticky=tk.W + tk.E, padx=10)
-
-#     # path entry field
-#     remote_path_entry = tk.Entry(remote_top_file_frame, width=45)
-#     remote_path_entry.configure(font=("Helvetica", 11, "bold"))
-#     remote_path_entry.grid(row=0, column=1, columnspan=2, sticky=tk.W + tk.E)
-
-#     # scrollbar
-#     remote_scroll_file_widget = tk.Scrollbar(remote_file_frame)
-#     remote_scroll_file_widget.grid(row=1, column=1, sticky=tk.N + tk.S)
-
-#     # Treeview
-#     remote_file_tree = ttk.Treeview(remote_file_frame, yscrollcommand=remote_scroll_file_widget.set)
-
-#     remote_scroll_file_widget.configure(command=remote_file_tree.yview)
-#     # defining the columns
-#     remote_file_tree["columns"] = ("Name", "Type", "Size", "Modified")
-
-#     # formatting the columns
-#     remote_file_tree.column("#0", width=50, minwidth=50, anchor=tk.W, stretch=tk.NO)
-#     remote_file_tree.column("Name", anchor=tk.W, width=130, minwidth=130)
-#     remote_file_tree.column("Type", anchor=tk.W, width=100, minwidth=100)
-#     remote_file_tree.column("Size", anchor=tk.CENTER, width=80, minwidth=80)
-#     remote_file_tree.column("Modified", anchor=tk.W, width=80, minwidth=80)
-
-#     # Heading of columns
-#     remote_file_tree.heading("#0", text="", anchor=tk.W)
-#     remote_file_tree.heading("Name", text="Name", anchor=tk.W)
-#     remote_file_tree.heading("Type", text="Type", anchor=tk.W)
-#     remote_file_tree.heading("Size", text="Size", anchor=tk.CENTER)
-#     remote_file_tree.heading("Modified", text="Modified", anchor=tk.W)
-
-#     # remote back button
-#     remote_prev_dir_btn = tk.Button(remote_top_file_frame, bd=0, image=back_img,
-#                                     command=lambda: back_button("button", "remote"))
-#     remote_prev_dir_btn.grid(row=0, column=0, sticky=tk.W, padx=10)
-
-#     remote_path_entry.insert(0, REMOTE_PATH)
-
-#     remote_tree_style = ttk.Style()
-#     remote_tree_style.configure('Treeview', rowheight=40)
-#     remote_file_tree.bind("<Double-1>", lambda event: change_path(event, system_name="remote"))
-#     remote_file_tree.grid(row=1, column=0, pady=10, sticky=tk.W + tk.E)
-
-#     system_choice["remote"][0] = remote_file_tree
-#     system_choice["remote"][1] = remote_path_entry
 
 
 def check_window_closed():
@@ -670,36 +361,6 @@ def check_window_closed():
             window_open = False
 
 
-# def file_transfer_window():
-#     global file_window
-#     file_button.configure(state="disabled")
-
-#     file_window = tk.Toplevel()
-#     file_window.title("File Transfer")
-#     file_window.resizable(False, False)
-
-#     # local file treeview
-#     local_file_treeview()
-
-#     # remote file_treeview
-#     remote_file_treeview()
-
-#     files_details_queue = Multiprocess_queue()
-
-#     connection.send_data(command_server_socket, COMMAND_HEADER_SIZE, bytes("start_file_explorer", "utf-8"))
-
-#     recv_file_details_process = Process(target=recv_file_details, args=(files_details_queue,),
-#                                         name="recv_file_details_process", daemon=True)
-#     recv_file_details_process.start()
-
-#     update_file_gui_thread = Thread(target=update_treeview, name="update_file_gui_thread", daemon=True)
-#     update_file_gui_thread.start()
-
-#     check_window_status_thread = Thread(target=check_window_closed, name="check_window_status", daemon=True)
-#     check_window_status_thread.start()
-
-#     drive_letters("local")
-#     drive_letters("remote")
 
 
 if __name__ == "__main__":
@@ -707,9 +368,6 @@ if __name__ == "__main__":
 
     command_server_socket = None
     remote_server_socket = None
-    # chat_server_socket = None
-    # file_server_socket = None
-    # browse_file_server_socket = None
 
     thread1 = None
     thread2 = None
@@ -721,27 +379,14 @@ if __name__ == "__main__":
     server_ip = str()
     server_port = int()
     status_event_log = 1
-
-    # local_drives = None
-    # remote_drives = None
-
     LOCAL_PATH = r""
-    # local_file_tree = None
-    # local_path_entry = None
-    REMOTE_PATH = r""
-    # remote_file_tree = None
-    # remote_path_entry = None
-    file_window = None
 
+    REMOTE_PATH = r""
+    file_window = None
     COMMAND_HEADER_SIZE = 2
-    # CHAT_HEADER_SIZE = 10
-    # FILE_HEADER_SIZE = 10
-    # LOCAL_CHAT_NAME = "Me"
-    # REMOTE_CHAT_NAME = "Remote Box"
 
     button_code = {Button.left: (1, 4), Button.right: (2, 5), Button.middle: (3, 6)}
-    # system_choice = {"local": [local_file_tree, local_path_entry, LOCAL_PATH],
-    #                  "remote": [remote_file_tree, remote_path_entry, REMOTE_PATH]}
+
 
     # Create Root Window
     root = tk.Tk()
@@ -773,11 +418,11 @@ if __name__ == "__main__":
     myFont_normal = Font(family="Helvetica", size=13)
 
     # My Notebook
-    my_notebook = ttk.Notebook(root)
-    my_notebook.grid(row=0, column=0, pady=5)
+    my_screen = ttk.Notebook(root)
+    my_screen.grid(row=0, column=0, pady=5)
 
     # <------Connection Tab -------------->
-    connection_frame = tk.LabelFrame(my_notebook, padx=100, pady=5, bd=0)
+    connection_frame = tk.LabelFrame(my_screen, padx=100, pady=5, bd=0)
     connection_frame.grid(row=0, column=0, padx=40, pady=40, sticky=tk.N)
 
     # Logo Label
@@ -791,7 +436,7 @@ if __name__ == "__main__":
     form_frame.grid(row=1, column=0, padx=120, pady=(40, 20), sticky=tk.N)
 
     # Form for Input data
-    name_label = tk.Label(form_frame, text="Computer Name/IP", padx=5, pady=5)
+    name_label = tk.Label(form_frame, text="Device Name/IP", padx=5, pady=5)
     name_label.configure(font=myFont_title_normal)
     name_label.grid(row=0, column=0, pady=5, columnspan=2, sticky=tk.W)
 
@@ -838,8 +483,6 @@ if __name__ == "__main__":
 
     # images
     remote_img = tk.PhotoImage(file="assets/gui_icons/remote_32.png")
-    # chat_img = tk.PhotoImage(file="assets/gui_icons/chat_32.png")
-    # file_transfer_img = tk.PhotoImage(file="assets/gui_icons/file_transfer_32.png")
 
     # View Remote Box button
     remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, padx=2,
@@ -849,7 +492,7 @@ if __name__ == "__main__":
 
     # <-------------Event log Tab --------------------->
     # Event_log Frame
-    event_frame = tk.LabelFrame(my_notebook, text="Event Log", padx=20, pady=20, relief=tk.FLAT)
+    event_frame = tk.LabelFrame(my_screen, text="Event Log", padx=20, pady=20, relief=tk.FLAT)
     event_frame.configure(font=myFont_title)
     event_frame.grid(row=3, column=0, columnspan=2, padx=40, pady=5, sticky=tk.W)
 
@@ -858,17 +501,14 @@ if __name__ == "__main__":
     scroll_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
 
     # Text Widget
-    text_1 = tk.Text(event_frame, width=50, height=7, font=("Helvetica", 13), padx=10, pady=10,
-                     yscrollcommand=scroll_widget.set)
+    text_1 = tk.Text(event_frame, width=50, height=7, font=("Helvetica", 13), padx=10, pady=10, yscrollcommand=scroll_widget.set)
     text_1.insert(1.0, "By Default Show Event Logs")
     text_1.configure(state='disabled')
     text_1.grid(row=0, column=0)
-
     scroll_widget.config(command=text_1.yview)
 
     # Status Label
-    label_status = tk.Label(root, text="Connected", image=green_img, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E,
-                            padx=10)
+    label_status = tk.Label(root, text="Connected", image=green_img, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E,  padx=10)
     label_status.configure(font=myFont_normal)
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
     label_status.grid_remove()
@@ -878,13 +518,10 @@ if __name__ == "__main__":
     tab_style.configure('TNotebook.Tab', font=('Helvetica', '13', 'bold'))
 
     # Tab Creation
-    my_notebook.add(connection_frame, text=" Connection ")
-    # my_notebook.add(chat_frame, text=" Chat ")
-    # my_notebook.add(file_transfer_frame, text=" File Transfer ")
-    my_notebook.add(event_frame, text=" Event Logs ")
+    my_screen.add(connection_frame, text=" Connection ")
+    my_screen.add(event_frame, text=" Event Logs ")
 
     # Hide Tab
-    my_notebook.hide(1)
-    # my_notebook.hide(2)
+    my_screen.hide(1)
 
     root.mainloop()

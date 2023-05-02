@@ -324,7 +324,7 @@ def stop_listining():
     pass_text.delete('1.0', tk.END)
 
 def login(sock):
-    global command_client_socket, client_socket_remote, chat_client_socket, file_client_socket, thread1, \
+    global command_client_socket, client_socket_remote, thread1, \
         CLIENT_CONNECTED
     accept = True
     try:
@@ -419,7 +419,7 @@ def add_text_chat_display_widget(msg, name):
 #         msg = input_text_widget.get()
 #         if msg and msg.strip() != "":
 #             input_text_widget.delete(0, "end")
-#             connection.send_data(chat_client_socket, CHAT_size_of_header, bytes(msg, "utf-8"))
+#             connection.send_data( CHAT_size_of_header, bytes(msg, "utf-8"))
 #             add_text_chat_display_widget(msg, LOCAL_CHAT_NAME)
 #     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
 #         print(e.strerror)
@@ -428,7 +428,7 @@ def add_text_chat_display_widget(msg, name):
 # def receive_chat_message():
 #     try:
 #         while True:
-#             msg = connection.data_recive(chat_client_socket, CHAT_size_of_header, bytes())[0].decode("utf-8")
+#             msg = connection.data_recive( CHAT_size_of_header, bytes())[0].decode("utf-8")
 #             add_text_chat_display_widget(msg, REMOTE_CHAT_NAME)
 #     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
 #         print(e.strerror)
@@ -438,15 +438,15 @@ def add_text_chat_display_widget(msg, name):
 
 # def download_file(filename):
 #     prev_msg = bytes()
-#     msg = connection.data_recive(file_client_socket, FILE_size_of_header, prev_msg)
+#     msg = connection.data_recive( FILE_size_of_header, prev_msg)
 #     file_size = int(msg[0].decode("utf-8"))
-#     msg = connection.data_recive(file_client_socket, FILE_size_of_header, msg[1])
+#     msg = connection.data_recive(FILE_size_of_header, msg[1])
 #     file_mode = msg[0].decode("utf-8")
 #     prev_msg = msg[1]
 #     total_data_size = int()
 #     with open(filename, file_mode) as f:
 #         while total_data_size < file_size:
-#             msg = connection.data_recive(file_client_socket, FILE_size_of_header, prev_msg)
+#             msg = connection.data_recive( FILE_size_of_header, prev_msg)
 #             data = msg[0]
 #             prev_msg = msg[1]
 #             if file_mode == "w" and data:
@@ -466,14 +466,14 @@ def scan_dir():
         return None
 
 
-# def toggle_event_log():
-#     global status_event_log
-#     if status_event_log == 1:
-#         event_frame.grid_forget()
-#         status_event_log = 0
-#     elif status_event_log == 0:
-#         event_frame.grid(row=3, column=0, columnspan=2, padx=40, pady=5, sticky=tk.W)
-#         status_event_log = 1
+def toggle_event_log():
+    global status_event_log
+    if status_event_log == 1:
+        event_frame.grid_forget()
+        status_event_log = 0
+    elif status_event_log == 0:
+        event_frame.grid(row=3, column=0, columnspan=2, padx=40, pady=5, sticky=tk.W)
+        status_event_log = 1
 
 
 if __name__ == "__main__":
@@ -484,9 +484,9 @@ if __name__ == "__main__":
     server_socket = None
     command_client_socket = None
     client_socket_remote = None
-    # chat_client_socket = None
-    # file_client_socket = None
-    # browse_file_client_socket = None
+    chat_client_socket = None
+    file_client_socket = None
+    browse_file_client_socket = None
 
     thread1 = None
     login_thread = None
@@ -497,8 +497,8 @@ if __name__ == "__main__":
     PASSWORD = str()
     url = str()
     SERVER_PORT = 1234
-    # CHAT_size_of_header = 10
-    # FILE_size_of_header = 10
+    CHAT_size_of_header = 10
+    FILE_size_of_header = 10
     COMMAND_size_of_header = 2
     CLIENT_CONNECTED = False
     LOCAL_CHAT_NAME = "Me"
@@ -507,7 +507,7 @@ if __name__ == "__main__":
     # Create Root Window
     root = tk.Tk()
     root.title("Remote Box")
-    root.iconbitmap("logo.ico")
+    # root.iconbitmap("logo.ico")
     root.resizable(False, False)
 
     
@@ -525,8 +525,8 @@ if __name__ == "__main__":
     listener_frame.grid(row=0, column=0)
 
     # Logo Label
-    img_logo = ImageTk.PhotoImage(Image.open("assets/gui_icons/logo.png"))
-    label_note = tk.Label(listener_frame, image=img_logo, anchor=tk.CENTER)
+    # img_logo = ImageTk.PhotoImage(Image.open("assets/gui_icons/logo.png"))
+    label_note = tk.Label(listener_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, padx=200, pady=5, columnspan=2, sticky=tk.N)
 
 # My fonts
@@ -553,8 +553,8 @@ if __name__ == "__main__":
     r2.configure(font=normal_font)
     r2.grid(row=1, column=0, sticky=tk.W, padx=20, pady=5)
 
-    # Start listener
-    start_btn = tk.Button(connection_frame, text="Start Listener", padx=2, pady=1,
+    # Start Listining
+    start_btn = tk.Button(connection_frame, text="Start Listining", padx=2, pady=1,
                              command=lambda: start_listining(radio_var.get()))
     start_btn.configure(font=title_font_normal)
     start_btn.grid(row=2, column=0, sticky=tk.W, pady=(20, 2), padx=(20, 2))
@@ -586,8 +586,8 @@ if __name__ == "__main__":
     pass_label.configure(font=title_font_normal)
     pass_text = tk.Text(details_frame, pady=5, width=47, height=1, background="#e6e6e6", bd=0)
 
-    # stop listener
-    stop_btn = tk.Button(details_frame, text="Stop Listener", padx=2, pady=1,
+    # Stop Listining
+    stop_btn = tk.Button(details_frame, text="Stop Listining", padx=2, pady=1,
                             command=lambda: stop_listining())
     stop_btn.configure(font=title_font_normal, state="disabled")
 
@@ -618,33 +618,32 @@ if __name__ == "__main__":
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
 
     # <------Chat Tab -------------->
-    # chat_frame = tk.LabelFrame(my_screen, padx=20, pady=20, bd=0)
-    # chat_frame.grid(row=0, column=0, sticky=tk.N)
+    chat_frame = tk.LabelFrame(my_screen, padx=20, pady=20, bd=0)
+    chat_frame.grid(row=0, column=0, sticky=tk.N)
 
-    # text_frame = tk.LabelFrame(chat_frame, bd=0)
-    # text_frame.grid(row=0, column=0)
+    text_frame = tk.LabelFrame(chat_frame, bd=0)
+    text_frame.grid(row=0, column=0)
 
     # Scroll bar to event frame
-    # scroll_chat_widget = tk.Scrollbar(chat_frame)
-    # scroll_chat_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
+    scroll_chat_widget = tk.Scrollbar(chat_frame)
+    scroll_chat_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
 
     # Text Widget
-    # text_chat_widget = tk.Text(chat_frame, width=50, height=20, font=("Arial", 14), padx=10, pady=10,
-    #                            yscrollcommand=scroll_chat_widget.set)
-    # text_chat_widget.configure(state='disabled')
-    # text_chat_widget.grid(row=0, column=0, sticky=tk.N)
+    text_chat_widget = tk.Text(chat_frame, width=50, height=20, font=("Arial", 14), padx=10, pady=10,
+                               yscrollcommand=scroll_chat_widget.set)
+    text_chat_widget.configure(state='disabled')
+    text_chat_widget.grid(row=0, column=0, sticky=tk.N)
 
-    # scroll_chat_widget.config(command=text_chat_widget.yview)
+    scroll_chat_widget.config(command=text_chat_widget.yview)
 
     # Frame for input text
-    # input_text_frame = tk.LabelFrame(chat_frame, pady=5, bd=0)
-    # input_text_frame.grid(row=1, column=0, sticky=tk.W)
+    input_text_frame = tk.LabelFrame(chat_frame, pady=5, bd=0)
+    input_text_frame.grid(row=1, column=0, sticky=tk.W)
 
     # Text Widget
-    # input_text_widget = tk.Entry(input_text_frame, width=50)
-    # input_text_widget.configure(font=("Arial", 14))
-    # input_text_widget.bind("<Return>", send_chat_message)
-    # input_text_widget.grid(row=0, column=0, pady=10, sticky=tk.W)
+    input_text_widget = tk.Entry(input_text_frame, width=50)
+    input_text_widget.configure(font=("Arial", 14))
+    input_text_widget.grid(row=0, column=0, pady=10, sticky=tk.W)
 
     # Create Tab style
     tab_style = ttk.Style()
@@ -652,7 +651,7 @@ if __name__ == "__main__":
 
     # Tab Creation
     my_screen.add(listener_frame, text=" Connection ")
-    # my_screen.add(chat_frame, text=" Chat ")
+    my_screen.add(chat_frame, text=" Chat ")
     my_screen.add(event_frame, text=" Event Logs ")
 
     # Hide Tab
