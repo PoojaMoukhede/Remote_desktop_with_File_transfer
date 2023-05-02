@@ -1,6 +1,6 @@
 import socket
 import mss
-import connection
+import connection_common  # import file which has data recive and send function
 import os
 import ctypes
 import string
@@ -27,8 +27,8 @@ def find_button(btn_code, event_Code):
     for key in btn_code.keys():
         if event_Code in key:
             return btn_code.get(key)
-
-
+        
+       
 def simulate(mouse, keyboard, btn_code, key_map, event_Code, msg):
     if event_Code == -1:
         if len(msg) == 1:
@@ -66,7 +66,7 @@ def event_recived(sock, path_of_wallpaper):
 
     try:
         while True:
-            msg = connection.data_recive(sock, size_of_header, prev_msg, 1024)
+            msg = connection_common.data_recive(sock, size_of_header, prev_msg, 1024)
             if msg:
                 data = msg[0].decode("utf-8")
                 event_Code = int(data[:2])
@@ -74,17 +74,12 @@ def event_recived(sock, path_of_wallpaper):
                 prev_msg = msg[1]                                               
     except (ConnectionAbortedError, ConnectionResetError, OSError) as exception_object:
         print(exception_object.strerror)
-    finally:
-        if path_of_wallpaper:
-            Desktop_background(path_of_wallpaper)
-        else:
-            print("Wallpaper did not restored....!")
 
 
-def take_screenshot(screenshot_list, client_width, client_height):
+def take_screenshot(screenshot_list, cli_width, cli_height):
     sct = mss.mss()
     sct.compression_level = 6
-    mon = {"top": 0, "left": 0, "width": client_width, "height": client_height}
+    mon = {"top": 0, "left": 0, "width": cli_width, "height": cli_height}
     capture = True
     while capture:
         screenshot = sct.grab(mon)
@@ -101,7 +96,7 @@ def take_from_list_and_send(screenshot_list, sock):
     try:
         while True:
             img_jpeg_data = screenshot_list.get()
-            connection.send_data(sock, size_of_header, img_jpeg_data)
+            connection_common.send_data(sock, size_of_header, img_jpeg_data)
     except (ConnectionAbortedError, ConnectionResetError, OSError):
         pass
 
@@ -113,31 +108,24 @@ def Desktop_bg_path():
         return path_buffer.value
     else:
         return None
-
-
-def Desktop_background(path):
-     # empty path means black
-    if path or path == "":             
-        ctypes.windll.user32.SystemParametersInfoW(20, 0, path, 0)
-
-
+    
 def screen_sending():
     global process1, process2, process3, client_socket_remote
     # remote display socket
     client_socket_remote, address = server_socket.accept()
-    disable_wallpaper = connection.data_recive(client_socket_remote, 2, bytes(), 1024)
+    disable_wallpaper = connection_common.data_recive(client_socket_remote, 2, bytes(), 1024)
+    
     if disable_wallpaper[0].decode("utf-8") == "True":
-        Desktop_background("")
+        print("")
     print(f"Your Desktop is now controlled remotely ...!")
 
-    client_width, client_height = ImageGrab.grab().size
-    resolution_msg = bytes(str(client_width) + "," + str(client_height), "utf-8")
-    connection.send_data(client_socket_remote, 2, resolution_msg)  # send display resolution
+    cli_width, cli_height = ImageGrab.grab().size
+    resolution_msg = bytes(str(cli_width) + "," + str(cli_height), "utf-8")
+    connection_common.send_data(client_socket_remote, 2, resolution_msg)
 
 
     screenshot_sync_queue = Queue(1)
-    process1 = Process(target=take_screenshot, args=(screenshot_sync_queue, client_width, client_height), daemon=True
-                       )
+    process1 = Process(target=take_screenshot, args=(screenshot_sync_queue, cli_width, cli_height), daemon=True)
     process1.start()
 
     process2 = Process(target=take_from_list_and_send, args=(screenshot_sync_queue, client_socket_remote), daemon=True)
@@ -146,15 +134,14 @@ def screen_sending():
     process3 = Process(target=event_recived, args=(client_socket_remote, PATH))
     process3.start()
 
-
-# #####---------->
-
+# ngrok config add-authtoken 2PEqo20xDqkICGPDLL8YNAh95l5_2zEmAiLSCPLh6qAjf9JWc
 
 def setup_ngrok():
     global url
     conf.DEFAULT_PYNGROK_CONFIG = PyngrokConfig(region="in", ngrok_path="{}".format(os.getenv('APPDATA') +    r'\RemoteApplication\ngrok.exe'))
     # pyngrok_config = PyngrokConfig(region="in")
-    ngrok.set_auth_token("1h35E4ZgL4VsxAdkjKuXZ7EMhqG_5Bco3S82TGPYEm2NgpS3h")
+    ngrok.set_auth_token("2PEqo20xDqkICGPDLL8YNAh95l5_2zEmAiLSCPLh6qAjf9JWc")
+    
     url = ngrok.connect(SERVER_PORT, "tcp", pyngrok_config=conf.DEFAULT_PYNGROK_CONFIG)
     device_name = re.search(r"//(.+):", url).group(1)
     port_no = re.search(r":(\d+)", url).group(1)
@@ -174,7 +161,8 @@ def close_socket():
         if sock:
             sock.close()
     if url:
-        ngrok.kill()        # ngrok.disconnect(url)  Only shuts the tunnel
+        ngrok.kill()    
+        # kill means ngrok disconnect   
     print("sockets cleaned up")
 
 
@@ -279,7 +267,7 @@ def start_listining(option_value):
 def stop_listining():
     global server_socket, client_socket_remote, url
     if CLIENT_CONNECTED:
-        connection.send_data(command_client_socket, COMMAND_size_of_header, bytes("disconnect", "utf-8"))
+        connection_common.send_data(command_client_socket, COMMAND_size_of_header, bytes("disconnect", "utf-8"))
     # Closing all the sockets
     if server_socket:
         server_socket.close()
@@ -300,13 +288,13 @@ def stop_listining():
         name_text.grid_forget()
         name_text.configure(state="normal")
         name_text.delete('1.0', tk.END)
-    label_status.configure(font=normal_font, text="Not Connected", image=red_img)
+    label_status.configure(font=normal_font, text="Not Connected", image=red)
     # Enable buttons
     connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)
     start_btn.configure(state=tk.NORMAL)
     r2.configure(state=tk.NORMAL)
     r1.configure(state=tk.NORMAL)
-    label_status.configure(font=normal_font, text="Not Connected", image=red_img)
+    label_status.configure(font=normal_font, text="Not Connected", image=red)
 
     # Disable button
     stop_btn.configure(state=tk.DISABLED)
@@ -332,38 +320,29 @@ def login(sock):
             print("\n")
             print("Start listening for incoming connection")
             add_text_event_widget(" ----> Start listening for incoming connection")
-            label_status.configure(font=normal_font, text="Start listening for incoming connection", image=yellow_img)
+            label_status.configure(font=normal_font, text="Start listening for incoming connection", image=yellow)
             command_client_socket, address = sock.accept()
             print(f"Recived login request from {address[0]}...")
-            pass_recv = connection.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
+            pass_recv = connection_common.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
             if pass_recv == PASSWORD:
-                connection.send_data(command_client_socket, 2, bytes("1", "utf-8"))  # success_code--> 1
-                # chat socket
-                # chat_client_socket, address = sock.accept()
-                # file transfer socket
-                # file_client_socket, address = sock.accept()
+                connection_common.send_data(command_client_socket, 2, bytes("1", "utf-8"))  # success_code--> 1
+    
                 print("\n")
                 print(f"Connection from {address[0]} has been connected!")
                 add_text_event_widget(f" ---->Connection from {address[0]} has been connected!")
-                label_status.configure(font=normal_font, text="Connected", image=green_img)
+                label_status.configure(font=normal_font, text="Connected", image=green)
                 # thread for listening to commands
                 thread1 = Thread(target=listinging_commands, name="listener_for_commands", daemon=True)
                 thread1.start()
                 CLIENT_CONNECTED = True
-                # thread for chat
-                # recv_chat_msg_thread = Thread(target=receive_chat_message, name="recv_chat_msg_thread", daemon=True)
-                # recv_chat_msg_thread.start()
-                # enable button frame
-
-                # my_screen.add(chat_frame, text=" Chat ")
                 accept = False
             else:
-                connection.send_data(command_client_socket, 2, bytes("0", "utf-8"))  # failure_code--> 0
+                connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))  # failure_code--> 0
                 print(f"{address[0]}...Please enter correct password")
                 add_text_event_widget(f"----> {address[0]}...Please enter correct password")
                 command_client_socket.close()
     except (ConnectionAbortedError, ConnectionResetError, OSError) as e:
-        label_status.configure(font=normal_font, text="Not Connected", image=red_img)
+        label_status.configure(font=normal_font, text="Not Connected", image=red)
         print(e.strerror)
         add_text_event_widget(f" ----> {e.strerror}")
 
@@ -373,7 +352,7 @@ def listinging_commands():
     listen = True
     try:
         while listen:
-            msg = connection.data_recive(command_client_socket, COMMAND_size_of_header, bytes(), 1024)[0].decode("utf-8")
+            msg = connection_common.data_recive(command_client_socket, COMMAND_size_of_header, bytes(), 1024)[0].decode("utf-8")
             print(f"Message received:{msg}")
             add_text_event_widget(f" ---> Message received:{msg}")
             if msg == "start_capture":
@@ -413,49 +392,6 @@ def add_text_chat_display_widget(msg, name):
     text_chat_widget.insert(tk.END, name + ": " + msg)
     text_chat_widget.configure(state="disabled")
 
-
-# def send_chat_message(event):
-#     try:
-#         msg = input_text_widget.get()
-#         if msg and msg.strip() != "":
-#             input_text_widget.delete(0, "end")
-#             connection.send_data( CHAT_size_of_header, bytes(msg, "utf-8"))
-#             add_text_chat_display_widget(msg, LOCAL_CHAT_NAME)
-#     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
-#         print(e.strerror)
-
-
-# def receive_chat_message():
-#     try:
-#         while True:
-#             msg = connection.data_recive( CHAT_size_of_header, bytes())[0].decode("utf-8")
-#             add_text_chat_display_widget(msg, REMOTE_CHAT_NAME)
-#     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
-#         print(e.strerror)
-#     except ValueError:
-#         pass
-
-
-# def download_file(filename):
-#     prev_msg = bytes()
-#     msg = connection.data_recive( FILE_size_of_header, prev_msg)
-#     file_size = int(msg[0].decode("utf-8"))
-#     msg = connection.data_recive(FILE_size_of_header, msg[1])
-#     file_mode = msg[0].decode("utf-8")
-#     prev_msg = msg[1]
-#     total_data_size = int()
-#     with open(filename, file_mode) as f:
-#         while total_data_size < file_size:
-#             msg = connection.data_recive( FILE_size_of_header, prev_msg)
-#             data = msg[0]
-#             prev_msg = msg[1]
-#             if file_mode == "w" and data:
-#                 f.write(data.decode("utf-8"))
-#             elif file_mode == "wb" and data:
-#                 f.write(data)
-#             total_data_size += len(data)
-
-
 def scan_dir():
     try:
         obj = os.scandir(PATH)
@@ -484,8 +420,6 @@ if __name__ == "__main__":
     server_socket = None
     command_client_socket = None
     client_socket_remote = None
-    chat_client_socket = None
-    file_client_socket = None
     browse_file_client_socket = None
 
     thread1 = None
@@ -497,39 +431,34 @@ if __name__ == "__main__":
     PASSWORD = str()
     url = str()
     SERVER_PORT = 1234
-    CHAT_size_of_header = 10
-    FILE_size_of_header = 10
     COMMAND_size_of_header = 2
     CLIENT_CONNECTED = False
     LOCAL_CHAT_NAME = "Me"
     REMOTE_CHAT_NAME = "Remote Box"
 
+
+    #Images
+    yellow = tk.PhotoImage(file="assets/yellow_dot.png")
+    green = tk.PhotoImage(file="assets/green_dot.png")
+    red = tk.PhotoImage(file="assets/red_dot.png")
+
     # Create Root Window
     root = tk.Tk()
     root.title("Remote Box")
-    # root.iconbitmap("logo.ico")
     root.resizable(False, False)
 
-    
     # My Notebook
     my_screen = ttk.Notebook(root)
     my_screen.grid(row=0, column=0, pady=5, columnspan=2)
-
-    #Images
-    yellow_img = tk.PhotoImage(file="assets/gui_icons/yellow_16.png")
-    green_img = tk.PhotoImage(file="assets/gui_icons/green_16.png")
-    red_img = tk.PhotoImage(file="assets/gui_icons/red_16.png")
-
-    # <------Connection Tab -------------->
+   
     listener_frame = tk.LabelFrame(my_screen, bd=0)
     listener_frame.grid(row=0, column=0)
 
     # Logo Label
-    # img_logo = ImageTk.PhotoImage(Image.open("assets/gui_icons/logo.png"))
     label_note = tk.Label(listener_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, padx=200, pady=5, columnspan=2, sticky=tk.N)
 
-# My fonts
+    # My fonts
     title_font = Font(family="Arial", size=14, weight="bold")
     title_font_normal = Font(family="Arial", size=13, weight="bold")
     normal_font = Font(family="Arial", size=13)
@@ -594,7 +523,6 @@ if __name__ == "__main__":
     # Disable details frame
     details_frame.grid_forget()
 
-    # <-------------Event log Tab --------------------->
     # Event_log Frame
     event_frame = tk.LabelFrame(my_screen, text="", padx=20, pady=20, relief=tk.FLAT)
     event_frame.configure(font=event_log_font)
@@ -613,11 +541,10 @@ if __name__ == "__main__":
     scroll_widget.config(command=text_event_log.yview)
 
     # Status Label
-    label_status = tk.Label(root, text="Not Connected", image=red_img, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E, padx=10)
+    label_status = tk.Label(root, text="Not Connected", image=red, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E, padx=10)
     label_status.configure(font=normal_font)
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
 
-    # <------Chat Tab -------------->
     chat_frame = tk.LabelFrame(my_screen, padx=20, pady=20, bd=0)
     chat_frame.grid(row=0, column=0, sticky=tk.N)
 
@@ -629,8 +556,7 @@ if __name__ == "__main__":
     scroll_chat_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
 
     # Text Widget
-    text_chat_widget = tk.Text(chat_frame, width=50, height=20, font=("Arial", 14), padx=10, pady=10,
-                               yscrollcommand=scroll_chat_widget.set)
+    text_chat_widget = tk.Text(chat_frame, width=50, height=20, font=("Arial", 14), padx=10, pady=10, yscrollcommand=scroll_chat_widget.set)
     text_chat_widget.configure(state='disabled')
     text_chat_widget.grid(row=0, column=0, sticky=tk.N)
 
