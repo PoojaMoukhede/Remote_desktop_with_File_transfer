@@ -21,7 +21,6 @@ from pynput.keyboard import Listener as Key_listener
 def send_event(msg, sock):
     connection_common.send_data(sock, 2, msg)
 
-
 def mouse_info(sock, event_queue, resize, cli_width, cli_height, dis_width, dis_height):
     while True:
         event_code = event_queue.get()
@@ -61,25 +60,19 @@ def check_within_display(x, y, resize, cli_width, cli_height, dis_width, dis_hei
 
 
 def on_move(x, y):
-    # print("Mouse listener working")
-    # event_code
     mouse_event.put(0)  
     mouse_event.put(x)
     mouse_event.put(y)
 
-
 def on_click(x, y, button, pressed):
-    if pressed: 
-        # mouse down(press)
+    if pressed:                                             # mouse down
         mouse_event.put(button_code.get(button)[0])
         mouse_event.put(x)
         mouse_event.put(y)
-    else: 
-        # mouse up(release)
-        mouse_event.put(button_code.get(button)[1])
+    else:                                                   # mouse up
+        mouse_event.put(button_code.get(button)[1]) 
         mouse_event.put(x)
         mouse_event.put(y)
-
 
 def on_scroll(x, y, dx, dy):
     mouse_event.put(7) 
@@ -87,7 +80,6 @@ def on_scroll(x, y, dx, dy):
     mouse_event.put(y)
     mouse_event.put(dx)
     mouse_event.put(dy)
-
 
 def recv_and_put_into_queue(client_socket, jpeg_queue):
     header_size = 10
@@ -158,10 +150,10 @@ def remote_display():
     print("Sent start_capture message")
     disable_choice = messagebox.askyesno("Remote Box", "Disable remote device wallpaper?(yes,Turn black)")
 
-    # remote display socket
+    # remote display sockets
     remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     remote_server_socket.connect((server_ip, server_port))
-    # wallpaper_settings
+    
     print(f"Disable choice: {disable_choice}")
     connection_common.send_data(remote_server_socket, COMMAND_HEADER_SIZE, bytes(str(disable_choice), "utf-8"))
     print("\n")
@@ -204,7 +196,7 @@ def login():
 
     server_ip = name_entry.get()
     server_port = int(port_entry.get())
-    server_pass = pass_entry.get()
+    server_pass = password_entry.get()
     if len(server_pass) == 6 and server_pass.strip() != "":
         try:
             command_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -218,13 +210,10 @@ def login():
             else:
                 print("\n")
                 print("Connected to the remote computer!")
-
                 label_status.grid()
                 execute = False
-
                 thread1 = Thread(target=listen_for_commands, daemon=True)
                 thread1.start()
-
 
                 # Enable
                 disconnect_button.configure(state="normal")
@@ -232,7 +221,7 @@ def login():
                 # Disable
                 name_entry.configure(state="disabled")
                 port_entry.configure(state="disabled")
-                pass_entry.configure(state="disabled")
+                password_entry.configure(state="disabled")
                 connect_button.configure(state="disabled")
 
         except OSError as e:
@@ -259,13 +248,12 @@ def disconnect(caller):
     # Enable
     name_entry.configure(state="normal")
     port_entry.configure(state="normal")
-    pass_entry.configure(state="normal")
+    password_entry.configure(state="normal")
     connect_button.configure(state="normal")
 
     # Disable
     disconnect_button.configure(state="disabled")
     label_status.grid_remove()
-
     access_button_frame.grid_forget()
     my_screen.hide(1)
     my_screen.hide(2)
@@ -283,116 +271,81 @@ def listen_for_commands():
     except ValueError:
         pass
     finally:
-        if (file_window is not None) and file_window.winfo_exists():
-            file_window.destroy()
-            print("top window destroyed")
         label_status.grid_remove()
         disconnect("message")
         print("Thread1 automatically exits")
 
 
-def check_window_closed():
-    window_open = True
-    while window_open:
-        if (file_window is not None) and file_window.winfo_exists():
-            time.sleep(3)
-            continue
-        else:
-            file_button.configure(state="normal")
-            window_open = False
-
-
-
-
 if __name__ == "__main__":
+    
     freeze_support()
-
     command_server_socket = None
     remote_server_socket = None
-
     thread1 = None
     thread2 = None
     listener_key = None
     listener_mouse = None
     process1 = None
     process2 = None
-
     server_ip = str()
     server_port = int()
     status_event_log = 1
-    LOCAL_PATH = r""
-
-    REMOTE_PATH = r""
-    file_window = None
     COMMAND_HEADER_SIZE = 2
-
     button_code = {Button.left: (1, 4), Button.right: (2, 5), Button.middle: (3, 6)}
 
-
-    # Create Root Window
     root = tk.Tk()
     root.title("Remote Box")
-    # root.iconbitmap("logo.ico")
     root.resizable(False, False)
 
-    # icons
+    # image & fonts
     green = tk.PhotoImage(file="assets/green_dot.png")
+    remote_img = tk.PhotoImage(file="assets/remote-desktop.png")
 
-    # My fonts
     title_font = Font(family="Arial", size=14, weight="bold")
     title_font_normal = Font(family="Arial", size=13, weight="bold")
     font_normal = Font(family="Arial", size=13)
 
-    # My Notebook
+    # My Screen Notebook
     my_screen = ttk.Notebook(root)
     my_screen.grid(row=0, column=0, pady=5)
-
     connection_frame = tk.LabelFrame(my_screen, padx=100, pady=5, bd=0)
     connection_frame.grid(row=0, column=0, padx=40, pady=40, sticky=tk.N)
 
-    # Logo Label
     label_note = tk.Label(connection_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, pady=5, columnspan=2, sticky=tk.N)
 
-    # Form elements frame
+    # Form frame
     form_frame = tk.LabelFrame(connection_frame, text="Control Remote Box", padx=20, pady=5)
     form_frame.configure(font=title_font)
     form_frame.grid(row=1, column=0, padx=120, pady=(40, 20), sticky=tk.N)
 
-    # Form for Input data
-    name_label = tk.Label(form_frame, text="Device Name/IP", padx=5, pady=5)
+    # Form 
+    name_label = tk.Label(form_frame, text="IP", padx=5, pady=5)
     name_label.configure(font=title_font_normal)
     name_label.grid(row=0, column=0, pady=5, columnspan=2, sticky=tk.W)
-
     name_entry = tk.Entry(form_frame, width=20)
     name_entry.configure(font=font_normal)
     name_entry.grid(row=1, column=0, pady=5, columnspan=2, sticky=tk.N)
-
     port_label = tk.Label(form_frame, text="Port", padx=5, pady=5)
     port_label.configure(font=title_font_normal)
     port_label.grid(row=2, column=0, pady=5, columnspan=2, sticky=tk.W)
-
     port_entry = tk.Entry(form_frame, width=20)
     port_entry.configure(font=font_normal)
     port_entry.grid(row=3, column=0, pady=5, columnspan=2, sticky=tk.N)
+    password_label = tk.Label(form_frame, text="Password", padx=5, pady=5)
+    password_label.configure(font=title_font_normal)
+    password_label.grid(row=4, column=0, pady=5, columnspan=2, sticky=tk.W)
+    password_entry = tk.Entry(form_frame, show="*", width=20)
+    password_entry.configure(font=font_normal)
+    password_entry.grid(row=5, column=0, pady=5, columnspan=2, sticky=tk.N)
 
-    pass_label = tk.Label(form_frame, text="Password", padx=5, pady=5)
-    pass_label.configure(font=title_font_normal)
-    pass_label.grid(row=4, column=0, pady=5, columnspan=2, sticky=tk.W)
-
-    pass_entry = tk.Entry(form_frame, show="*", width=20)
-    pass_entry.configure(font=font_normal)
-    pass_entry.grid(row=5, column=0, pady=5, columnspan=2, sticky=tk.N)
-
-    # Button frame
     button_frame = tk.LabelFrame(form_frame, padx=2, pady=5, bd=0)
     button_frame.grid(row=6, column=0, padx=5, pady=2)
 
-    # Connect and Disconnect button
+    # Connect and Disconnect button design
     connect_button = tk.Button(button_frame, text="Connect", padx=4, pady=1, command=login)
     connect_button.configure(font=title_font_normal)
     connect_button.grid(row=0, column=0, sticky=tk.N, padx=5, pady=5)
-
     disconnect_button = tk.Button(button_frame, text="Disconnect", padx=2, pady=1, command=lambda: disconnect("button"))
     disconnect_button.configure(font=title_font_normal, state=tk.DISABLED)
     disconnect_button.grid(row=0, column=1, sticky=tk.N, padx=5, pady=5)
@@ -405,31 +358,11 @@ if __name__ == "__main__":
     # Disable access frame when not connected
     access_button_frame.grid_forget()
 
-    # images
-    remote_img = tk.PhotoImage(file="assets/remote-desktop.png")
-    
     # View Remote Box button
-    remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, padx=2,
-                              pady=2, bd=0, command=remote_display)
+    remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, padx=2,  pady=2, bd=0, command=remote_display)
     remote_button.configure(font=font_normal)
     remote_button.grid(row=0, column=1, sticky=tk.W, padx=30)  # padx =60
-
-    # Event_log Frame
-    event_frame = tk.LabelFrame(my_screen, text="Event Log", padx=20, pady=20, relief=tk.FLAT)
-    event_frame.configure(font=title_font)
-    event_frame.grid(row=3, column=0, columnspan=2, padx=40, pady=5, sticky=tk.W)
-
-    # Scroll bar to event frame
-    scroll_widget = tk.Scrollbar(event_frame)
-    scroll_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
-
-    # Text Widget
-    text_1 = tk.Text(event_frame, width=50, height=7, font=("Arial", 13), padx=10, pady=10, yscrollcommand=scroll_widget.set)
-    text_1.insert(1.0, "By Default Show Event Logs")
-    text_1.configure(state='disabled')
-    text_1.grid(row=0, column=0)
-    scroll_widget.config(command=text_1.yview)
-
+    
     # Status Label
     label_status = tk.Label(root, text="Connected", image=green, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E,  padx=10)
     label_status.configure(font=font_normal)
@@ -439,12 +372,6 @@ if __name__ == "__main__":
     # Create Tab style
     tab_style = ttk.Style()
     tab_style.configure('TNotebook.Tab', font=('Arial', '13', 'bold'))
-
-    # Tab Creation
     my_screen.add(connection_frame, text=" Connection ")
-    my_screen.add(event_frame, text=" Event Logs ")
-
-    # Hide Tab by there id 
-    my_screen.hide(1)
 
     root.mainloop()
