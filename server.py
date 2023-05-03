@@ -19,6 +19,7 @@ from pyngrok.conf import PyngrokConfig
 import tkinter as tk
 from tkinter.font import Font
 from tkinter import ttk
+import sys
 
 
 def find_button(btn_code, event_Code):
@@ -108,10 +109,10 @@ def Desktop_bg_path():
         return None
     
 def screen_sending():
-    global process1, process2, process3, client_socket_remote
+    global process1, process2, process3, client_socket
     # remote display socket
-    client_socket_remote, address = server_socket.accept()
-    disable_wallpaper = connection_common.data_recive(client_socket_remote, 2, bytes(), 1024)
+    client_socket, address = server_socket.accept()
+    disable_wallpaper = connection_common.data_recive(client_socket, 2, bytes(), 1024)
     
     if disable_wallpaper[0].decode("utf-8") == "True":
         print("")
@@ -119,16 +120,16 @@ def screen_sending():
 
     cli_width, cli_height = ImageGrab.grab().size
     resolution_msg = bytes(str(cli_width) + "," + str(cli_height), "utf-8")
-    connection_common.send_data(client_socket_remote, 2, resolution_msg)
+    connection_common.send_data(client_socket, 2, resolution_msg)
 
     screenshot_sync_queue = Queue(1)
     process1 = Process(target=take_screenshot, args=(screenshot_sync_queue, cli_width, cli_height), daemon=True)
     process1.start()
 
-    process2 = Process(target=take_from_list_and_send, args=(screenshot_sync_queue, client_socket_remote), daemon=True)
+    process2 = Process(target=take_from_list_and_send, args=(screenshot_sync_queue, client_socket), daemon=True)
     process2.start()
 
-    process3 = Process(target=event_recived, args=(client_socket_remote, PATH))
+    process3 = Process(target=event_recived, args=(client_socket, PATH))
     process3.start()
 
 # ngrok config add-authtoken 2PEqo20xDqkICGPDLL8YNAh95l5_2zEmAiLSCPLh6qAjf9JWc
@@ -153,7 +154,7 @@ def socket_listener_create(server_ip, server_port):
 
 
 def close_socket():
-    service_socket_list = [command_client_socket, client_socket_remote]
+    service_socket_list = [command_client_socket, client_socket]
     for sock in service_socket_list:
         if sock:
             sock.close()
@@ -174,7 +175,7 @@ def process_cleanup():
 
 
 def start_listining(option_value):
-    global client_socket_remote, server_socket, PASSWORD, login_thread
+    global client_socket, server_socket, PASSWORD, login_thread
     # Disable buttons
     start_btn.configure(state=tk.DISABLED)
     radio_btn.configure(state=tk.DISABLED)
@@ -219,7 +220,7 @@ def start_listining(option_value):
 
         # Device Name details
         name_label.grid(row=0, column=0, sticky=tk.W, pady=2)
-        name_text.insert(1.0, "{:<15} (Works in any network scenario)".format(server_name))
+        name_text.insert(1.0, "{:<15} (Works In any network)".format(server_name))
         name_text.configure(font=normal_font, state='disabled')
         name_text.grid(row=0, column=1, sticky=tk.W, pady=2)
 
@@ -246,8 +247,8 @@ def start_listining(option_value):
 
 
 def stop_listining():
-    global server_socket, client_socket_remote, url
-    if CLIENT_CONNECTED:
+    global server_socket, client_socket, url
+    if IS_CLIENT_CONNECTED:
         connection_common.send_data(command_client_socket, COMMAND_size_of_header, bytes("disconnect", "utf-8"))
         
     # Closing all the sockets
@@ -291,18 +292,18 @@ def stop_listining():
     password_text.delete('1.0', tk.END)
 
 def login(sock):
-    global command_client_socket, client_socket_remote, thread1, \
-        CLIENT_CONNECTED
+    global command_client_socket, client_socket, thread1, \
+        IS_CLIENT_CONNECTED
     accept = True
     try:
         while accept:
             print("\n")
             print("Start listening for incoming connection")
-            label_status.configure(font=normal_font, text="Start listening for incoming connection", image=yellow)
+            label_status.configure(font=normal_font, text="Start listening", image=yellow)
             command_client_socket, address = sock.accept()
             print(f"Recived login request from {address[0]}...")
-            pass_recv = connection_common.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
-            if pass_recv == PASSWORD:
+            received_password = connection_common.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
+            if received_password == PASSWORD:
                 connection_common.send_data(command_client_socket, 2, bytes("1", "utf-8"))  
     
                 print("\n")
@@ -310,7 +311,7 @@ def login(sock):
                 label_status.configure(font=normal_font, text="Connected", image=green)
                 thread1 = Thread(target=listinging_commands, name="listener_for_commands", daemon=True)   # thread for listening command
                 thread1.start()
-                CLIENT_CONNECTED = True
+                IS_CLIENT_CONNECTED = True
                 accept = False
             else:
                 connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))  
@@ -322,7 +323,7 @@ def login(sock):
 
 
 def listinging_commands():
-    global login_thread, CLIENT_CONNECTED
+    global login_thread, IS_CLIENT_CONNECTED
     listen = True
     try:
         while listen:
@@ -340,7 +341,7 @@ def listinging_commands():
     except ValueError:
         pass
     finally:
-        CLIENT_CONNECTED = False
+        IS_CLIENT_CONNECTED = False
         close_socket()
         process_cleanup()
         login_thread = Thread(target=login, name="login_thread", args=(server_socket,), daemon=True)
@@ -353,9 +354,8 @@ if __name__ == "__main__":
     freeze_support()
     PATH = Desktop_bg_path()
     server_socket = None
+    client_socket = None
     command_client_socket = None
-    client_socket_remote = None
-    browse_file_client_socket = None
     thread1 = None
     login_thread = None
     process1 = None
@@ -365,86 +365,95 @@ if __name__ == "__main__":
     url = str()
     SERVER_PORT = 1234
     COMMAND_size_of_header = 2
-    CLIENT_CONNECTED = False
+    IS_CLIENT_CONNECTED = False
 
     root = tk.Tk()
     root.title("Remote Box")
     root.resizable(False, False)
+    # root.configure(0,0,image=bg_img)
 
     # My Screen Notebook
     my_screen = ttk.Notebook(root)
     my_screen.grid(row=0, column=0, pady=5, columnspan=2)
     listener_frame = tk.LabelFrame(my_screen)
+    listener_frame.configure(background='#ADD8E6')
     listener_frame.grid(row=0, column=0)
 
-     #Images
+    #Images
+    # remote = tk.PhotoImage(file='assets/remote-desktop.png') 
     yellow = tk.PhotoImage(file="assets/yellow_dot.png")
     green = tk.PhotoImage(file="assets/green_dot.png")
     red = tk.PhotoImage(file="assets/red_dot.png")
+    bg_img = tk.PhotoImage(file='assets/helpcenter.png')
 
     label_note = tk.Label(listener_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, padx=200, pady=5, columnspan=2, sticky=tk.N)
-
-    title_font = Font(family="Arial", size=14, weight="bold")
+    
+    heading_fort = Font(family="Arial", size=17, weight="bold")
+    title_font = Font(family="Arial", size=14, weight='normal')
     title_font_normal = Font(family="Arial", size=13, weight="bold")
     normal_font = Font(family="Arial", size=13)
-    font_event_log_date = Font(family="Arial", size=7)
-    event_log_font = Font(family="Arial", size=10)
+
+    heading = tk.Label(listener_frame, text="Remote Control Access",font=heading_fort ,bg='#ADD8E6')  
+    heading.place(x=150,y=43)  
 
     # Connection Frame
     connection_frame = tk.LabelFrame(listener_frame, text="Connection Mode", padx=90, pady=30)
-    connection_frame.configure(font=title_font)
+    connection_frame.configure(font=title_font,background='#ADD8E6')
     connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)
 
 
     radio_var = tk.IntVar()
     radio_var.set(1)
     radio_btn = tk.Radiobutton(connection_frame, text="IP", variable=radio_var, value=1)
-    radio_btn.configure(font=normal_font)
+    radio_btn.configure(font=normal_font,background='#ADD8E6')
     radio_btn.grid(row=0, column=0, sticky=tk.W, padx=20, pady=5)
     start_btn = tk.Button(connection_frame, text="Start Listining", padx=2, pady=1, command=lambda: start_listining(radio_var.get()))
-    start_btn.configure(font=title_font_normal)
+    start_btn.configure(font=title_font_normal,bg='brown',fg='white')
     start_btn.grid(row=2, column=0, sticky=tk.W, pady=(20, 2), padx=(20, 2))
 
     # Details Frame
     details_frame = tk.LabelFrame(listener_frame, text="Allow Remote Access", padx=20, pady=20, labelanchor=tk.NE)
-    details_frame.configure(font=title_font)
+    details_frame.configure(font=title_font,background='#ADD8E6')
     details_frame.grid(row=1, column=0, padx=40, pady=40)
 
     # Local IP Design
-    local_ip_label = tk.Label(details_frame, text="LOCAL IP     :", padx=5, pady=5)
-    local_ip_label.configure(font=title_font_normal)
-    local_ip_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    local_ip_label = tk.Label(details_frame, text="LOCAL IP     :", padx=5, pady=5 )
+    local_ip_label.configure(font=title_font_normal,bg='#ADD8E6')
+    local_ip_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
     
     # Public IP Design
     public_ip_label = tk.Label(details_frame, text="PUBLIC IP    :", padx=5, pady=5)
-    public_ip_label.configure(font=title_font_normal)
-    public_ip_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    public_ip_label.configure(font=title_font_normal,bg='#ADD8E6')
+    public_ip_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
     
-    # Device Name Design
+    # Device Name Design in diffrent network
     name_label = tk.Label(details_frame, text="Device Name :", padx=5, pady=5)
-    name_label.configure(font=title_font_normal)
-    name_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    name_label.configure(font=title_font_normal,bg='#ADD8E6')
+    name_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
     
     # Port Design
-    port_label = tk.Label(details_frame, text="Port no        :", padx=5, pady=5)
-    port_label.configure(font=title_font_normal)
-    port_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    port_label = tk.Label(details_frame, text="PORT NO        :", padx=5, pady=5)
+    port_label.configure(font=title_font_normal,bg='#ADD8E6')
+    port_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
     
     # Password Design
-    password_label = tk.Label(details_frame, text="Password    :", padx=5, pady=5)
-    password_label.configure(font=title_font_normal)
-    password_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    password_label = tk.Label(details_frame, text="PASSWORD   :", padx=5, pady=5)
+    password_label.configure(font=title_font_normal,bg='#ADD8E6')
+    password_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
 
     stop_btn = tk.Button(details_frame, text="Stop Listining", padx=2, pady=1, command=lambda: stop_listining())
-    stop_btn.configure(font=title_font_normal, state="disabled")
+    stop_btn.configure(font=title_font_normal, state="disabled",bg='brown',fg='white')
 
     # Details Frame Disable 
     details_frame.grid_forget()
     
     label_status = tk.Label(root, text="Not Connected", image=red, compound=tk.LEFT, relief=tk.SUNKEN, anchor=tk.E, padx=10)
-    label_status.configure(font=normal_font)
+    label_status.configure(font=normal_font,background='#ADD8E6')
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
+
+    # trying to set background image to root  
+    limg = tk.Label(root,image=bg_img)
 
     # Create Tab 
     tab_style = ttk.Style()
