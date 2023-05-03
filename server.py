@@ -16,8 +16,6 @@ from pynput.mouse import Button, Controller as Mouse_controller
 from pynput.keyboard import Key, Controller as Keyboard_controller
 from pyngrok import ngrok, conf
 from pyngrok.conf import PyngrokConfig
-from datetime import datetime
-import time
 import tkinter as tk
 from tkinter.font import Font
 from tkinter import ttk
@@ -52,7 +50,7 @@ def simulate(mouse, keyboard, btn_code, key_map, event_Code, msg):
         mouse.release(find_button(btn_code, event_Code))
 
 
-def event_recived(sock):
+def event_recived(sock, path_of_wallpaper):
     mouse = Mouse_controller()
     btn_code = {(1, 4): Button.left, (2, 5): Button.right, (3, 6): Button.middle}
 
@@ -123,7 +121,6 @@ def screen_sending():
     resolution_msg = bytes(str(cli_width) + "," + str(cli_height), "utf-8")
     connection_common.send_data(client_socket_remote, 2, resolution_msg)
 
-
     screenshot_sync_queue = Queue(1)
     process1 = Process(target=take_screenshot, args=(screenshot_sync_queue, cli_width, cli_height), daemon=True)
     process1.start()
@@ -180,8 +177,7 @@ def start_listining(option_value):
     global client_socket_remote, server_socket, PASSWORD, login_thread
     # Disable buttons
     start_btn.configure(state=tk.DISABLED)
-    r2.configure(state=tk.DISABLED)
-    r1.configure(state=tk.DISABLED)
+    radio_btn.configure(state=tk.DISABLED)
     connection_frame.grid_forget()
     
     #random password generation uppercase + number and length is 6
@@ -191,67 +187,54 @@ def start_listining(option_value):
         server_ip = socket.gethostbyname(socket.gethostname())  # Local IP
         public_ip = requests.get('https://api.ipify.org').text
 
-        # Show details
+
         # Local IP details
-
         local_ip_label.grid(row=0, column=0, sticky=tk.W, pady=2)
-
-        local_ip_text.insert(1.0, "{:<15} (only works when device have same network or wifi)".format(server_ip))
+        local_ip_text.insert(1.0, "{:<15} (Works when on same wifi or network)".format(server_ip))
         local_ip_text.configure(font=normal_font, state='disabled')
         local_ip_text.grid(row=0, column=1, sticky=tk.W, pady=2)
 
         # Public IP details
         public_ip_label.grid(row=1, column=0, sticky=tk.W, pady=2)
-
-        public_ip_text.insert(1.0, "{:<15} (Works when on different network)"
-                              .format(public_ip))
+        public_ip_text.insert(1.0, "{:<15} (Works when on different network)"  .format(public_ip))
         public_ip_text.configure(font=normal_font, state='disabled')
         public_ip_text.grid(row=1, column=1, sticky=tk.W, pady=2)
 
         # Port details
-
         port_label.grid(row=2, column=0, sticky=tk.W, pady=2)
-
         port_text.insert(1.0, "{:<15}".format(SERVER_PORT))
         port_text.configure(font=normal_font, state='disabled')
         port_text.grid(row=2, column=1, sticky=tk.W, pady=2)
 
         # Password Details
-        pass_label.grid(row=3, column=0, sticky=tk.W, pady=2)
-
-        pass_text.insert(1.0, "{:<15}".format(PASSWORD))
-        pass_text.configure(font=normal_font, state='disabled')
-        pass_text.grid(row=3, column=1, sticky=tk.W, pady=2)
-
+        password_label.grid(row=3, column=0, sticky=tk.W, pady=2)
+        password_text.insert(1.0, "{:<15}".format(PASSWORD))
+        password_text.configure(font=normal_font, state='disabled')
+        password_text.grid(row=3, column=1, sticky=tk.W, pady=2)
         stop_btn.grid(row=4, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
 
-    # else:
-    #     server_ip = "127.0.0.1"
-    #     server_name, port = setup_ngrok()
+    else:
+        server_ip = "127.0.0.1"
+        server_name, port = setup_ngrok()
 
-    #     # Show details
-    #     # Device Name details
-    #     name_label.grid(row=0, column=0, sticky=tk.W, pady=2)
+        # Device Name details
+        name_label.grid(row=0, column=0, sticky=tk.W, pady=2)
+        name_text.insert(1.0, "{:<15} (Works in any network scenario)".format(server_name))
+        name_text.configure(font=normal_font, state='disabled')
+        name_text.grid(row=0, column=1, sticky=tk.W, pady=2)
 
-    #     name_text.insert(1.0, "{:<15} (Works in any network)".format(server_name))
-    #     name_text.configure(font=normal_font, state='disabled')
-    #     name_text.grid(row=0, column=1, sticky=tk.W, pady=2)
+        # Port details
+        port_label.grid(row=1, column=0, sticky=tk.W, pady=2)
+        port_text.insert(1.0, "{:<15}".format(port))
+        port_text.configure(font=normal_font, state='disabled')
+        port_text.grid(row=1, column=1, sticky=tk.W, pady=2)
 
-    #     # Port details
-    #     port_label.grid(row=1, column=0, sticky=tk.W, pady=2)
-
-    #     port_text.insert(1.0, "{:<15}".format(port))
-    #     port_text.configure(font=normal_font, state='disabled')
-    #     port_text.grid(row=1, column=1, sticky=tk.W, pady=2)
-
-    #     # Password Details
-    #     pass_label.grid(row=2, column=0, sticky=tk.W, pady=2)
-
-    #     pass_text.insert(1.0, "{:<15}".format(PASSWORD))
-    #     pass_text.configure(font=normal_font, state='disabled')
-    #     pass_text.grid(row=2, column=1, sticky=tk.W, pady=2)
-
-    #     stop_btn.grid(row=3, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
+        # Password Details
+        password_label.grid(row=2, column=0, sticky=tk.W, pady=2)
+        password_text.insert(1.0, "{:<15}".format(PASSWORD))
+        password_text.configure(font=normal_font, state='disabled')
+        password_text.grid(row=2, column=1, sticky=tk.W, pady=2)
+        stop_btn.grid(row=3, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
 
     server_socket = socket_listener_create(server_ip, SERVER_PORT)
     login_thread = Thread(target=login, name="login_thread", args=(server_socket,), daemon=True)
@@ -260,14 +243,13 @@ def start_listining(option_value):
     # Enable button
     details_frame.grid(row=1, column=0, padx=40, pady=40)
     stop_btn.configure(state=tk.NORMAL)
-    # print("Remote desktop function can be executed now")
-    # remote_display()
 
 
 def stop_listining():
     global server_socket, client_socket_remote, url
     if CLIENT_CONNECTED:
         connection_common.send_data(command_client_socket, COMMAND_size_of_header, bytes("disconnect", "utf-8"))
+        
     # Closing all the sockets
     if server_socket:
         server_socket.close()
@@ -289,28 +271,24 @@ def stop_listining():
         name_text.configure(state="normal")
         name_text.delete('1.0', tk.END)
     label_status.configure(font=normal_font, text="Not Connected", image=red)
-    # Enable buttons
-    connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)
+   
+    connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)  # Enable buttons
     start_btn.configure(state=tk.NORMAL)
-    r2.configure(state=tk.NORMAL)
-    r1.configure(state=tk.NORMAL)
+    radio_btn.configure(state=tk.NORMAL)
     label_status.configure(font=normal_font, text="Not Connected", image=red)
 
     # Disable button
     stop_btn.configure(state=tk.DISABLED)
     details_frame.grid_forget()
-    
-    my_screen.hide(1)
 
     port_label.grid_forget()
     port_text.grid_forget()
     port_text.configure(state="normal")
     port_text.delete('1.0', tk.END)
-
-    pass_label.grid_forget()
-    pass_text.grid_forget()
-    pass_text.configure(state="normal")
-    pass_text.delete('1.0', tk.END)
+    password_label.grid_forget()
+    password_text.grid_forget()
+    password_text.configure(state="normal")
+    password_text.delete('1.0', tk.END)
 
 def login(sock):
     global command_client_socket, client_socket_remote, thread1, \
@@ -320,31 +298,27 @@ def login(sock):
         while accept:
             print("\n")
             print("Start listening for incoming connection")
-            add_text_event_widget(" ----> Start listening for incoming connection")
             label_status.configure(font=normal_font, text="Start listening for incoming connection", image=yellow)
             command_client_socket, address = sock.accept()
             print(f"Recived login request from {address[0]}...")
             pass_recv = connection_common.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
             if pass_recv == PASSWORD:
-                connection_common.send_data(command_client_socket, 2, bytes("1", "utf-8"))  # success_code--> 1
+                connection_common.send_data(command_client_socket, 2, bytes("1", "utf-8"))  
+    
                 print("\n")
                 print(f"Connection from {address[0]} has been connected!")
-                add_text_event_widget(f" ---->Connection from {address[0]} has been connected!")
                 label_status.configure(font=normal_font, text="Connected", image=green)
-                # thread for listening to commands
-                thread1 = Thread(target=listinging_commands, name="listener_for_commands", daemon=True)
+                thread1 = Thread(target=listinging_commands, name="listener_for_commands", daemon=True)   # thread for listening command
                 thread1.start()
                 CLIENT_CONNECTED = True
                 accept = False
             else:
-                connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))  # failure_code--> 0
+                connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))  
                 print(f"{address[0]}...Please enter correct password")
-                add_text_event_widget(f"----> {address[0]}...Please enter correct password")
                 command_client_socket.close()
     except (ConnectionAbortedError, ConnectionResetError, OSError) as e:
         label_status.configure(font=normal_font, text="Not Connected", image=red)
         print(e.strerror)
-        add_text_event_widget(f" ----> {e.strerror}")
 
 
 def listinging_commands():
@@ -354,7 +328,6 @@ def listinging_commands():
         while listen:
             msg = connection_common.data_recive(command_client_socket, COMMAND_size_of_header, bytes(), 1024)[0].decode("utf-8")
             print(f"Message received:{msg}")
-            add_text_event_widget(f" ---> Message received:{msg}")
             if msg == "start_capture":
                 screen_sending()
             elif msg == "stop_capture":
@@ -364,11 +337,9 @@ def listinging_commands():
                 print("Disconnect message received")
     except (ConnectionAbortedError, ConnectionResetError, OSError) as e:
         print(e.strerror)
-        add_text_event_widget(f" ---> {e.strerror}")
     except ValueError:
         pass
     finally:
-        my_screen.hide(1)
         CLIENT_CONNECTED = False
         close_socket()
         process_cleanup()
@@ -377,116 +348,61 @@ def listinging_commands():
         print("Thread1 automatically exits")
 
 
-def add_text_event_widget(msg):
-    text_event_log.configure(state=tk.NORMAL, font=font_event_log_date, width=77, height=28)
-    text_event_log.insert(tk.END, "\n")
-    text_event_log.insert(tk.END, datetime.fromtimestamp(time.time()).strftime("%d-%m-%Y %I:%M %p"))
-    text_event_log.configure(font=event_log_font, width=77, height=28)
-    text_event_log.insert(tk.END, msg)
-    text_event_log.configure(state="disabled")
-
-
-def add_text_chat_display_widget(msg, name):
-    text_chat_widget.configure(state=tk.NORMAL)
-    text_chat_widget.insert(tk.END, "\n")
-    text_chat_widget.insert(tk.END, name + ": " + msg)
-    text_chat_widget.configure(state="disabled")
-
-def scan_dir():
-    try:
-        obj = os.scandir(PATH)
-        return obj
-    except PermissionError:
-        print("No permission to acces this resource")
-        back_button("function")
-        return None
-
-
-def toggle_event_log():
-    global status_event_log
-    if status_event_log == 1:
-        event_frame.grid_forget()
-        status_event_log = 0
-    elif status_event_log == 0:
-        event_frame.grid(row=3, column=0, columnspan=2, padx=40, pady=5, sticky=tk.W)
-        status_event_log = 1
-
-
 if __name__ == "__main__":
+    
     freeze_support()
-
     PATH = Desktop_bg_path()
-
     server_socket = None
     command_client_socket = None
     client_socket_remote = None
     browse_file_client_socket = None
-
     thread1 = None
     login_thread = None
     process1 = None
     process2 = None
     process3 = None
-
     PASSWORD = str()
     url = str()
     SERVER_PORT = 1234
     COMMAND_size_of_header = 2
     CLIENT_CONNECTED = False
-    LOCAL_CHAT_NAME = "Me"
-    REMOTE_CHAT_NAME = "Remote Box"
 
-
-
-    # Create Root Window
     root = tk.Tk()
     root.title("Remote Box")
     root.resizable(False, False)
 
-    # My Notebook
+    # My Screen Notebook
     my_screen = ttk.Notebook(root)
     my_screen.grid(row=0, column=0, pady=5, columnspan=2)
-   
-    listener_frame = tk.LabelFrame(my_screen, bd=0)
+    listener_frame = tk.LabelFrame(my_screen)
     listener_frame.grid(row=0, column=0)
 
-    #Images
-    yellow = tk.PhotoImage(file="./assets/yellow_dot.png")
-    green = tk.PhotoImage(file="./assets/green_dot.png")
-    red = tk.PhotoImage(file="./assets/red_dot.png")
+     #Images
+    yellow = tk.PhotoImage(file="assets/yellow_dot.png")
+    green = tk.PhotoImage(file="assets/green_dot.png")
+    red = tk.PhotoImage(file="assets/red_dot.png")
 
-
-    # Logo Label
     label_note = tk.Label(listener_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, padx=200, pady=5, columnspan=2, sticky=tk.N)
 
-    # My fonts
     title_font = Font(family="Arial", size=14, weight="bold")
     title_font_normal = Font(family="Arial", size=13, weight="bold")
     normal_font = Font(family="Arial", size=13)
     font_event_log_date = Font(family="Arial", size=7)
     event_log_font = Font(family="Arial", size=10)
 
-
     # Connection Frame
     connection_frame = tk.LabelFrame(listener_frame, text="Connection Mode", padx=90, pady=30)
     connection_frame.configure(font=title_font)
     connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)
 
-    # Radio button
+
     radio_var = tk.IntVar()
     radio_var.set(1)
-    r1 = tk.Radiobutton(connection_frame, text="IP", variable=radio_var, value=1)
-    r1.configure(font=normal_font)
-    r1.grid(row=0, column=0, sticky=tk.W, padx=20, pady=5)
-
-    r2 = tk.Radiobutton(connection_frame, text="Device Name", variable=radio_var, value=2)
-    r2.configure(font=normal_font)
-    r2.grid(row=1, column=0, sticky=tk.W, padx=20, pady=5)
-
-    # Start Listining
-    start_btn = tk.Button(connection_frame, text="Start Listining", padx=2, pady=1,
-                             command=lambda: start_listining(radio_var.get()))
+    radio_btn = tk.Radiobutton(connection_frame, text="IP", variable=radio_var, value=1)
+    radio_btn.configure(font=normal_font)
+    radio_btn.grid(row=0, column=0, sticky=tk.W, padx=20, pady=5)
+    start_btn = tk.Button(connection_frame, text="Start Listining", padx=2, pady=1, command=lambda: start_listining(radio_var.get()))
     start_btn.configure(font=title_font_normal)
     start_btn.grid(row=2, column=0, sticky=tk.W, pady=(20, 2), padx=(20, 2))
 
@@ -495,92 +411,44 @@ if __name__ == "__main__":
     details_frame.configure(font=title_font)
     details_frame.grid(row=1, column=0, padx=40, pady=40)
 
-    # Details label and text
-    # Local IP details
-    local_ip_label = tk.Label(details_frame, text="LOCAL IP      :", padx=5, pady=5)
+    # Local IP Design
+    local_ip_label = tk.Label(details_frame, text="LOCAL IP     :", padx=5, pady=5)
     local_ip_label.configure(font=title_font_normal)
-    local_ip_text = tk.Text(details_frame, pady=5, width=47, height=1, background="#e6e6e6", bd=0)
-    # Public IP details
-    public_ip_label = tk.Label(details_frame, text="PUBLIC IP     :", padx=5, pady=5)
+    local_ip_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    
+    # Public IP Design
+    public_ip_label = tk.Label(details_frame, text="PUBLIC IP    :", padx=5, pady=5)
     public_ip_label.configure(font=title_font_normal)
-    public_ip_text = tk.Text(details_frame, pady=5, width=47, height=1, background="#e6e6e6", bd=0)
-    # Device Name details
+    public_ip_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    
+    # Device Name Design
     name_label = tk.Label(details_frame, text="Device Name :", padx=5, pady=5)
     name_label.configure(font=title_font_normal)
-    name_text = tk.Text(details_frame, pady=5, width=47, height=1, background="#e6e6e6", bd=0)
-    # Port details
-    port_label = tk.Label(details_frame, text="Port no         :", padx=5, pady=5)
+    name_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    
+    # Port Design
+    port_label = tk.Label(details_frame, text="Port no        :", padx=5, pady=5)
     port_label.configure(font=title_font_normal)
-    port_text = tk.Text(details_frame, pady=5, width=47, height=1, background="#e6e6e6", bd=0)
-    # Password Details
-    pass_label = tk.Label(details_frame, text="Password     :", padx=5, pady=5)
-    pass_label.configure(font=title_font_normal)
-    pass_text = tk.Text(details_frame, pady=5, width=47, height=1, background="#e6e6e6", bd=0)
+    port_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
+    
+    # Password Design
+    password_label = tk.Label(details_frame, text="Password    :", padx=5, pady=5)
+    password_label.configure(font=title_font_normal)
+    password_text = tk.Text(details_frame, background="#e6e6e6",width=47, height=1,pady=5)
 
-    # Stop Listining
-    stop_btn = tk.Button(details_frame, text="Stop Listining", padx=2, pady=1,
-                            command=lambda: stop_listining())
+    stop_btn = tk.Button(details_frame, text="Stop Listining", padx=2, pady=1, command=lambda: stop_listining())
     stop_btn.configure(font=title_font_normal, state="disabled")
 
-    # Disable details frame
+    # Details Frame Disable 
     details_frame.grid_forget()
-
-    # Event_log Frame
-    event_frame = tk.LabelFrame(my_screen, text="", padx=20, pady=20, relief=tk.FLAT)
-    event_frame.configure(font=event_log_font)
-    event_frame.grid(row=3, column=0, columnspan=2, padx=40, pady=5, sticky=tk.W)
-
-    # Scroll bar to event frame
-    scroll_widget = tk.Scrollbar(event_frame)
-    scroll_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
-
-    # Text Widget
-    text_event_log = tk.Text(event_frame, width=65, height=26, padx=10, pady=10, yscrollcommand=scroll_widget.set)
-    text_event_log.insert(1.0, "")
-    text_event_log.configure(state='disabled')
-    text_event_log.grid(row=0, column=0)
-
-    scroll_widget.config(command=text_event_log.yview)
-
-    # Status Label
-    label_status = tk.Label(root, text="Not Connected", image=red, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E, padx=10)
+    
+    label_status = tk.Label(root, text="Not Connected", image=red, compound=tk.LEFT, relief=tk.SUNKEN, anchor=tk.E, padx=10)
     label_status.configure(font=normal_font)
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
 
-    chat_frame = tk.LabelFrame(my_screen, padx=20, pady=20, bd=0)
-    chat_frame.grid(row=0, column=0, sticky=tk.N)
-
-    text_frame = tk.LabelFrame(chat_frame, bd=0)
-    text_frame.grid(row=0, column=0)
-
-    # Scroll bar to event frame
-    scroll_chat_widget = tk.Scrollbar(chat_frame)
-    scroll_chat_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
-
-    # Text Widget
-    text_chat_widget = tk.Text(chat_frame, width=50, height=20, font=("Arial", 14), padx=10, pady=10, yscrollcommand=scroll_chat_widget.set)
-    text_chat_widget.configure(state='disabled')
-    text_chat_widget.grid(row=0, column=0, sticky=tk.N)
-
-    scroll_chat_widget.config(command=text_chat_widget.yview)
-
-    # Frame for input text
-    input_text_frame = tk.LabelFrame(chat_frame, pady=5, bd=0)
-    input_text_frame.grid(row=1, column=0, sticky=tk.W)
-
-    # Text Widget
-    input_text_widget = tk.Entry(input_text_frame, width=50)
-    input_text_widget.configure(font=("Arial", 14))
-    input_text_widget.grid(row=0, column=0, pady=10, sticky=tk.W)
-
-    # Create Tab style
+    # Create Tab 
     tab_style = ttk.Style()
     tab_style.configure('TNotebook.Tab', font=('Arial', '13', 'bold'))
-
-    # Tab Creation
     my_screen.add(listener_frame, text=" Connection ")
-    my_screen.add(chat_frame, text=" Chat ")
-    my_screen.add(event_frame, text=" Event Logs ")
-    my_screen.hide(1)
 
     root.mainloop()
