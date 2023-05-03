@@ -1,8 +1,8 @@
 import socket
 import mss
-import connection_common  # import file which has data recive and send function
 import os
 import ctypes
+import connection_common  # import file which has data recive and send function
 import string
 import random
 import requests
@@ -27,8 +27,8 @@ def find_button(btn_code, event_Code):
     for key in btn_code.keys():
         if event_Code in key:
             return btn_code.get(key)
-        
-       
+
+
 def simulate(mouse, keyboard, btn_code, key_map, event_Code, msg):
     if event_Code == -1:
         if len(msg) == 1:
@@ -75,11 +75,10 @@ def event_recived(sock):
     except (ConnectionAbortedError, ConnectionResetError, OSError) as exception_object:
         print(exception_object.strerror)
 
-
-def take_screenshot(screenshot_list, cli_width, cli_height):
+def take_screenshot(screenshot_list, client_width, client_height):
     sct = mss.mss()
     sct.compression_level = 6
-    mon = {"top": 0, "left": 0, "width": cli_width, "height": cli_height}
+    mon = {"top": 0, "left": 0, "width": client_width, "height": client_height}
     capture = True
     while capture:
         screenshot = sct.grab(mon)
@@ -108,24 +107,31 @@ def Desktop_bg_path():
         return path_buffer.value
     else:
         return None
-    
+
+
+def Desktop_background(path):
+     # empty path means black
+    if path or path == "":             
+        ctypes.windll.user32.SystemParametersInfoW(20, 0, path, 0)
+
+
 def screen_sending():
     global process1, process2, process3, client_socket_remote
     # remote display socket
     client_socket_remote, address = server_socket.accept()
     disable_wallpaper = connection_common.data_recive(client_socket_remote, 2, bytes(), 1024)
-    
     if disable_wallpaper[0].decode("utf-8") == "True":
-        print("")
+        Desktop_background("")
     print(f"Your Desktop is now controlled remotely ...!")
 
-    cli_width, cli_height = ImageGrab.grab().size
-    resolution_msg = bytes(str(cli_width) + "," + str(cli_height), "utf-8")
-    connection_common.send_data(client_socket_remote, 2, resolution_msg)
+    client_width, client_height = ImageGrab.grab().size
+    resolution_msg = bytes(str(client_width) + "," + str(client_height), "utf-8")
+    connection_common.send_data(client_socket_remote, 2, resolution_msg)  # send display resolution
 
 
     screenshot_sync_queue = Queue(1)
-    process1 = Process(target=take_screenshot, args=(screenshot_sync_queue, cli_width, cli_height), daemon=True)
+    process1 = Process(target=take_screenshot, args=(screenshot_sync_queue, client_width, client_height), daemon=True
+                       )
     process1.start()
 
     process2 = Process(target=take_from_list_and_send, args=(screenshot_sync_queue, client_socket_remote), daemon=True)
@@ -134,14 +140,12 @@ def screen_sending():
     process3 = Process(target=event_recived, args=(client_socket_remote, PATH))
     process3.start()
 
-# ngrok config add-authtoken 2PEqo20xDqkICGPDLL8YNAh95l5_2zEmAiLSCPLh6qAjf9JWc
 
 def setup_ngrok():
     global url
     conf.DEFAULT_PYNGROK_CONFIG = PyngrokConfig(region="in", ngrok_path="{}".format(os.getenv('APPDATA') +    r'\RemoteApplication\ngrok.exe'))
     # pyngrok_config = PyngrokConfig(region="in")
     ngrok.set_auth_token("2PEqo20xDqkICGPDLL8YNAh95l5_2zEmAiLSCPLh6qAjf9JWc")
-    
     url = ngrok.connect(SERVER_PORT, "tcp", pyngrok_config=conf.DEFAULT_PYNGROK_CONFIG)
     device_name = re.search(r"//(.+):", url).group(1)
     port_no = re.search(r":(\d+)", url).group(1)
@@ -161,8 +165,7 @@ def close_socket():
         if sock:
             sock.close()
     if url:
-        ngrok.kill()    
-        # kill means ngrok disconnect   
+        ngrok.kill()        # ngrok.disconnect(url)  Only shuts the tunnel
     print("sockets cleaned up")
 
 
@@ -225,33 +228,33 @@ def start_listining(option_value):
 
         stop_btn.grid(row=4, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
 
-    # else:
-    #     server_ip = "127.0.0.1"
-    #     server_name, port = setup_ngrok()
+    else:
+        server_ip = "127.0.0.1"
+        server_name, port = setup_ngrok()
 
-    #     # Show details
-    #     # Device Name details
-    #     name_label.grid(row=0, column=0, sticky=tk.W, pady=2)
+        # Show details
+        # Device Name details
+        name_label.grid(row=0, column=0, sticky=tk.W, pady=2)
 
-    #     name_text.insert(1.0, "{:<15} (Works in any network)".format(server_name))
-    #     name_text.configure(font=normal_font, state='disabled')
-    #     name_text.grid(row=0, column=1, sticky=tk.W, pady=2)
+        name_text.insert(1.0, "{:<15} (Works in any network scenario)".format(server_name))
+        name_text.configure(font=normal_font, state='disabled')
+        name_text.grid(row=0, column=1, sticky=tk.W, pady=2)
 
-    #     # Port details
-    #     port_label.grid(row=1, column=0, sticky=tk.W, pady=2)
+        # Port details
+        port_label.grid(row=1, column=0, sticky=tk.W, pady=2)
 
-    #     port_text.insert(1.0, "{:<15}".format(port))
-    #     port_text.configure(font=normal_font, state='disabled')
-    #     port_text.grid(row=1, column=1, sticky=tk.W, pady=2)
+        port_text.insert(1.0, "{:<15}".format(port))
+        port_text.configure(font=normal_font, state='disabled')
+        port_text.grid(row=1, column=1, sticky=tk.W, pady=2)
 
-    #     # Password Details
-    #     pass_label.grid(row=2, column=0, sticky=tk.W, pady=2)
+        # Password Details
+        pass_label.grid(row=2, column=0, sticky=tk.W, pady=2)
 
-    #     pass_text.insert(1.0, "{:<15}".format(PASSWORD))
-    #     pass_text.configure(font=normal_font, state='disabled')
-    #     pass_text.grid(row=2, column=1, sticky=tk.W, pady=2)
+        pass_text.insert(1.0, "{:<15}".format(PASSWORD))
+        pass_text.configure(font=normal_font, state='disabled')
+        pass_text.grid(row=2, column=1, sticky=tk.W, pady=2)
 
-    #     stop_btn.grid(row=3, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
+        stop_btn.grid(row=3, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
 
     server_socket = socket_listener_create(server_ip, SERVER_PORT)
     login_thread = Thread(target=login, name="login_thread", args=(server_socket,), daemon=True)
@@ -288,18 +291,17 @@ def stop_listining():
         name_text.grid_forget()
         name_text.configure(state="normal")
         name_text.delete('1.0', tk.END)
-    label_status.configure(font=normal_font, text="Not Connected", image=red)
+    label_status.configure(font=normal_font, text="Not Connected", image=red_img)
     # Enable buttons
     connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)
     start_btn.configure(state=tk.NORMAL)
     r2.configure(state=tk.NORMAL)
     r1.configure(state=tk.NORMAL)
-    label_status.configure(font=normal_font, text="Not Connected", image=red)
+    label_status.configure(font=normal_font, text="Not Connected", image=red_img)
 
     # Disable button
     stop_btn.configure(state=tk.DISABLED)
     details_frame.grid_forget()
-    
     my_screen.hide(1)
 
     port_label.grid_forget()
@@ -321,7 +323,7 @@ def login(sock):
             print("\n")
             print("Start listening for incoming connection")
             add_text_event_widget(" ----> Start listening for incoming connection")
-            label_status.configure(font=normal_font, text="Start listening for incoming connection", image=yellow)
+            label_status.configure(font=normal_font, text="Start listening for incoming connection", image=yellow_img)
             command_client_socket, address = sock.accept()
             print(f"Recived login request from {address[0]}...")
             pass_recv = connection_common.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
@@ -330,7 +332,7 @@ def login(sock):
                 print("\n")
                 print(f"Connection from {address[0]} has been connected!")
                 add_text_event_widget(f" ---->Connection from {address[0]} has been connected!")
-                label_status.configure(font=normal_font, text="Connected", image=green)
+                label_status.configure(font=normal_font, text="Connected", image=green_img)
                 # thread for listening to commands
                 thread1 = Thread(target=listinging_commands, name="listener_for_commands", daemon=True)
                 thread1.start()
@@ -342,7 +344,7 @@ def login(sock):
                 add_text_event_widget(f"----> {address[0]}...Please enter correct password")
                 command_client_socket.close()
     except (ConnectionAbortedError, ConnectionResetError, OSError) as e:
-        label_status.configure(font=normal_font, text="Not Connected", image=red)
+        label_status.configure(font=normal_font, text="Not Connected", image=red_img)
         print(e.strerror)
         add_text_event_widget(f" ----> {e.strerror}")
 
@@ -392,6 +394,7 @@ def add_text_chat_display_widget(msg, name):
     text_chat_widget.insert(tk.END, name + ": " + msg)
     text_chat_widget.configure(state="disabled")
 
+
 def scan_dir():
     try:
         obj = os.scandir(PATH)
@@ -436,31 +439,29 @@ if __name__ == "__main__":
     LOCAL_CHAT_NAME = "Me"
     REMOTE_CHAT_NAME = "Remote Box"
 
-
-
     # Create Root Window
     root = tk.Tk()
     root.title("Remote Box")
     root.resizable(False, False)
 
+    
     # My Notebook
     my_screen = ttk.Notebook(root)
     my_screen.grid(row=0, column=0, pady=5, columnspan=2)
-   
-    listener_frame = tk.LabelFrame(my_screen, bd=0)
-    listener_frame.grid(row=0, column=0)
 
     #Images
-    yellow = tk.PhotoImage(file="./assets/yellow_dot.png")
-    green = tk.PhotoImage(file="./assets/green_dot.png")
-    red = tk.PhotoImage(file="./assets/red_dot.png")
+    yellow_img = tk.PhotoImage(file="./assets/yellow_dot.png")
+    green_img = tk.PhotoImage(file="./assets/green_dot.png")
+    red_img = tk.PhotoImage(file="./assets/red_dot.png")
 
+    listener_frame = tk.LabelFrame(my_screen, bd=0)
+    listener_frame.grid(row=0, column=0)
 
     # Logo Label
     label_note = tk.Label(listener_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, padx=200, pady=5, columnspan=2, sticky=tk.N)
 
-    # My fonts
+# My fonts
     title_font = Font(family="Arial", size=14, weight="bold")
     title_font_normal = Font(family="Arial", size=13, weight="bold")
     normal_font = Font(family="Arial", size=13)
@@ -525,6 +526,7 @@ if __name__ == "__main__":
     # Disable details frame
     details_frame.grid_forget()
 
+    # <-------------Event log Tab --------------------->
     # Event_log Frame
     event_frame = tk.LabelFrame(my_screen, text="", padx=20, pady=20, relief=tk.FLAT)
     event_frame.configure(font=event_log_font)
@@ -543,10 +545,11 @@ if __name__ == "__main__":
     scroll_widget.config(command=text_event_log.yview)
 
     # Status Label
-    label_status = tk.Label(root, text="Not Connected", image=red, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E, padx=10)
+    label_status = tk.Label(root, text="Not Connected", image=red_img, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E, padx=10)
     label_status.configure(font=normal_font)
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
 
+    # <------Chat Tab -------------->
     chat_frame = tk.LabelFrame(my_screen, padx=20, pady=20, bd=0)
     chat_frame.grid(row=0, column=0, sticky=tk.N)
 
@@ -558,7 +561,8 @@ if __name__ == "__main__":
     scroll_chat_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
 
     # Text Widget
-    text_chat_widget = tk.Text(chat_frame, width=50, height=20, font=("Arial", 14), padx=10, pady=10, yscrollcommand=scroll_chat_widget.set)
+    text_chat_widget = tk.Text(chat_frame, width=50, height=20, font=("Arial", 14), padx=10, pady=10,
+                               yscrollcommand=scroll_chat_widget.set)
     text_chat_widget.configure(state='disabled')
     text_chat_widget.grid(row=0, column=0, sticky=tk.N)
 
@@ -581,6 +585,8 @@ if __name__ == "__main__":
     my_screen.add(listener_frame, text=" Connection ")
     my_screen.add(chat_frame, text=" Chat ")
     my_screen.add(event_frame, text=" Event Logs ")
+
+    # Hide Tab
     my_screen.hide(1)
 
     root.mainloop()

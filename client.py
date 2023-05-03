@@ -22,12 +22,12 @@ def send_event(msg, sock):
     connection_common.send_data(sock, 2, msg)
 
 
-def mouse_info(sock, event_queue, resize, cli_width, cli_height, dis_width, dis_height):
+def mouse_info(sock, event_queue, resize, cli_width, cli_height, display_width, display_height):
     while True:
         event_code = event_queue.get()
         x = event_queue.get()
         y = event_queue.get()
-        x, y, within_display = check_within_display(x, y, resize, cli_width, cli_height, dis_width, dis_height)
+        x, y, within_display = check_within_display(x, y, resize, cli_width, cli_height, display_width, display_height)
         if event_code == 0 or event_code == 7:
             if within_display:
                 if event_code == 7:
@@ -41,45 +41,23 @@ def mouse_info(sock, event_queue, resize, cli_width, cli_height, dis_width, dis_
                 send_event(msg, sock)
 
 
-def scale_x_y(x, y, cli_width, cli_height, dis_width, dis_height):
-    scale_x = cli_width / dis_width
-    scale_y = cli_height / dis_height
+def scale_x_y(x, y, cli_width, cli_height, display_width, display_height):
+    scale_x = cli_width / display_width
+    scale_y = cli_height / display_height
     x *= scale_x
     y *= scale_y
     return round(x, 1), round(y, 1)
 
 
-def check_within_display(x, y, resize, cli_width, cli_height, dis_width, dis_height):
+def check_within_display(x, y, resize, cli_width, cli_height, display_width, display_height):
     active_window = pygetwindow.getWindowsWithTitle(f"Remote Desktop")
     if active_window and (len(active_window) == 1):
         x, y = win32gui.ScreenToClient(active_window[0]._hWnd, (x, y))
-        if (0 <= x <= dis_width) and (0 <= y <= dis_height):
+        if (0 <= x <= display_width) and (0 <= y <= display_height):
             if resize:
-                x, y = scale_x_y(x, y, cli_width, cli_height, dis_width, dis_height)
+                x, y = scale_x_y(x, y, cli_width, cli_height, display_width, display_height)
             return x, y, True
     return x, y, False
-
-
-def on_move(x, y):
-    # print("Mouse listener working")
-    # event_code
-    mouse_event.put(0)  
-    mouse_event.put(x)
-    mouse_event.put(y)
-
-
-def on_click(x, y, button, pressed):
-    if pressed: 
-        # mouse down(press)
-        mouse_event.put(button_code.get(button)[0])
-        mouse_event.put(x)
-        mouse_event.put(y)
-    else: 
-        # mouse up(release)
-        mouse_event.put(button_code.get(button)[1])
-        mouse_event.put(x)
-        mouse_event.put(y)
-
 
 def on_scroll(x, y, dx, dy):
     mouse_event.put(7) 
@@ -88,8 +66,28 @@ def on_scroll(x, y, dx, dy):
     mouse_event.put(dx)
     mouse_event.put(dy)
 
+def on_click(x, y, button, pressed):
+    if pressed: 
+        # mouse down
+        mouse_event.put(button_code.get(button)[0])
+        mouse_event.put(x)
+        mouse_event.put(y)
+    else: 
+        # mouse up
+        mouse_event.put(button_code.get(button)[1])
+        mouse_event.put(x)
+        mouse_event.put(y)
 
-def recv_and_put_into_queue(client_socket, jpeg_queue):
+
+def on_move(x, y):
+    # print("Mouse listener working")
+    mouse_event.put(0)  
+    mouse_event.put(x)
+    mouse_event.put(y)
+
+
+
+def recv_and_put_into_queue(client_socket, jpeg_list):
     header_size = 10
     partial_prev_msg = bytes()
 
@@ -97,7 +95,7 @@ def recv_and_put_into_queue(client_socket, jpeg_queue):
         while True:
             msg = connection_common.data_recive(client_socket, header_size, partial_prev_msg)
             if msg:
-                jpeg_queue.put(lz4.frame.decompress(msg[0])) 
+                jpeg_list.put(lz4.frame.decompress(msg[0])) 
                 partial_prev_msg = msg[1]
     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
         print(e.strerror)
@@ -107,10 +105,10 @@ def recv_and_put_into_queue(client_socket, jpeg_queue):
         print("Thread2 automatically exits")
 
 
-def display_data(jpeg_queue, status_queue, dis_width, dis_height, resize):
+def display_data(jpeg_list, status_queue, display_width, display_height, resize):
     os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
     pygame.init()
-    display_surface = pygame.display.set_mode((dis_width, dis_height))
+    display_surface = pygame.display.set_mode((display_width, display_height))
     pygame.display.set_caption(f"Remote Desktop")
     clock = pygame.time.Clock()
     display = True
@@ -121,11 +119,11 @@ def display_data(jpeg_queue, status_queue, dis_width, dis_height, resize):
                 status_queue.put("stop")
                 pygame.quit()
                 return
-        jpeg_buffer = BytesIO(jpeg_queue.get())
+        jpeg_buffer = BytesIO(jpeg_list.get())
         img = Image.open(jpeg_buffer)
         py_image = pygame.image.frombuffer(img.tobytes(), img.size, img.mode)
         if resize:
-            py_image = pygame.transform.scale(py_image, (dis_width, dis_height))
+            py_image = pygame.transform.scale(py_image, (display_width, display_height))
         jpeg_buffer.close()
         display_surface.blit(py_image, (0, 0))
         pygame.display.flip()
@@ -165,12 +163,11 @@ def remote_display():
     print(f"Disable choice: {disable_choice}")
     connection_common.send_data(remote_server_socket, COMMAND_HEADER_SIZE, bytes(str(disable_choice), "utf-8"))
     print("\n")
-    print(f">>You can now CONTROL the remote desktop now")
+    print(f"----->NOW YOU CAN CONTROL REMOTE DESKTOP")
     resize_option = False
     server_width, server_height = ImageGrab.grab().size
     client_resolution = connection_common.data_recive(remote_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
     client_width, client_height = client_resolution.split(",")
-
     display_width, display_height = int(client_width), int(client_height)
     
 
