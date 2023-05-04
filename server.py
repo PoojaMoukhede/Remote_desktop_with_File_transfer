@@ -51,7 +51,7 @@ def simulate(mouse, keyboard, btn_code, key_map, event_Code, msg):
         mouse.release(find_button(btn_code, event_Code))
 
 
-def event_recived(sock, path_of_wallpaper):
+def event_recived(sock):
     mouse = Mouse_controller()
     btn_code = {(1, 4): Button.left, (2, 5): Button.right, (3, 6): Button.middle}
 
@@ -186,7 +186,7 @@ def start_listining(option_value):
 
     if option_value == 1:
         server_ip = socket.gethostbyname(socket.gethostname())  # Local IP
-        public_ip = requests.get('https://api.ipify.org').text
+        # public_ip = requests.get('https://api.ipify.org').text
 
 
         # Local IP details
@@ -195,11 +195,11 @@ def start_listining(option_value):
         local_ip_text.configure(font=normal_font, state='disabled')
         local_ip_text.grid(row=0, column=1, sticky=tk.W, pady=2)
 
-        # Public IP details
-        public_ip_label.grid(row=1, column=0, sticky=tk.W, pady=2)
-        public_ip_text.insert(1.0, "{:<15} (Works when on different network)"  .format(public_ip))
-        public_ip_text.configure(font=normal_font, state='disabled')
-        public_ip_text.grid(row=1, column=1, sticky=tk.W, pady=2)
+        # # Public IP details
+        # public_ip_label.grid(row=1, column=0, sticky=tk.W, pady=2)
+        # public_ip_text.insert(1.0, "{:<15} (Works when on different network)"  .format(public_ip))
+        # public_ip_text.configure(font=normal_font, state='disabled')
+        # public_ip_text.grid(row=1, column=1, sticky=tk.W, pady=2)
 
         # Port details
         port_label.grid(row=2, column=0, sticky=tk.W, pady=2)
@@ -262,10 +262,10 @@ def stop_listining():
         local_ip_text.grid_forget()
         local_ip_text.configure(state="normal")
         local_ip_text.delete('1.0', tk.END)
-        public_ip_label.grid_forget()
-        public_ip_text.grid_forget()
-        public_ip_text.configure(state="normal")
-        public_ip_text.delete('1.0', tk.END)
+        # public_ip_label.grid_forget()
+        # public_ip_text.grid_forget()
+        # public_ip_text.configure(state="normal")
+        # public_ip_text.delete('1.0', tk.END)
     elif radio_var.get() == 2:
         name_label.grid_forget()
         name_text.grid_forget()
@@ -281,7 +281,6 @@ def stop_listining():
     # Disable button
     stop_btn.configure(state=tk.DISABLED)
     details_frame.grid_forget()
-
     port_label.grid_forget()
     port_text.grid_forget()
     port_text.configure(state="normal")
@@ -416,16 +415,17 @@ if __name__ == "__main__":
     details_frame = tk.LabelFrame(listener_frame, text="Allow Remote Access", padx=20, pady=20, labelanchor=tk.NE)
     details_frame.configure(font=title_font,background='#ADD8E6')
     details_frame.grid(row=1, column=0, padx=40, pady=40)
+    
 
     # Local IP Design
     local_ip_label = tk.Label(details_frame, text="LOCAL IP     :", padx=5, pady=5 )
     local_ip_label.configure(font=title_font_normal,bg='#ADD8E6')
     local_ip_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
     
-    # Public IP Design
-    public_ip_label = tk.Label(details_frame, text="PUBLIC IP    :", padx=5, pady=5)
-    public_ip_label.configure(font=title_font_normal,bg='#ADD8E6')
-    public_ip_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
+    # # Public IP Design
+    # public_ip_label = tk.Label(details_frame, text="PUBLIC IP    :", padx=5, pady=5)
+    # public_ip_label.configure(font=title_font_normal,bg='#ADD8E6')
+    # public_ip_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
     
     # Device Name Design in diffrent network
     name_label = tk.Label(details_frame, text="Device Name :", padx=5, pady=5)
@@ -453,11 +453,15 @@ if __name__ == "__main__":
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
 
     # trying to set background image to root  
-    limg = tk.Label(root,image=bg_img)
+
+    # img = tk.PhotoImage(file="./assets/helpcenter.png")
+    # label = tk.Label(root, image=img)
+    # label.place(x=30, y=30)
+
 
     # Create Tab 
     tab_style = ttk.Style()
-    tab_style.configure('TNotebook.Tab', font=('Arial', '13', 'bold'))
+    tab_style.configure('TNotebook.Tab', font=title_font_normal)
     my_screen.add(listener_frame, text=" Connection ")
 
     root.mainloop()

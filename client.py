@@ -6,9 +6,7 @@ import connection_common  # import file which has data recive and send function
 from PIL import Image, ImageGrab, ImageTk
 import pygetwindow
 from pynput.mouse import Button, Listener as Mouse_listener
-import time
 import win32gui
-import re
 import os
 from io import BytesIO
 import pygame
@@ -17,11 +15,10 @@ from threading import Thread
 from multiprocessing import freeze_support, Process, Queue as Multiprocess_queue
 from pynput.keyboard import Listener as Key_listener
 
-
 def send_event_to_remote(message, sock):
     connection_common.send_data(sock, 2, message)
 
-def mouse_information(sock, event_queue, resize, cli_width, cli_height, disp_width, disp_height):
+def mouse_controlling(sock, event_queue, resize, cli_width, cli_height, disp_width, disp_height):
     while True:
         event_code = event_queue.get()
         x = event_queue.get()
@@ -66,6 +63,7 @@ def on_move(x, y):
     mouse_event.put(x)
     mouse_event.put(y)
 
+
 def on_click(x, y, button, pressed):
     if pressed:                                             # mouse down
         mouse_event.put(button_code.get(button)[0])
@@ -76,12 +74,14 @@ def on_click(x, y, button, pressed):
         mouse_event.put(x)
         mouse_event.put(y)
 
+
 def on_scroll(x, y, dx, dy):
     mouse_event.put(7) 
     mouse_event.put(x)
     mouse_event.put(y)
     mouse_event.put(dx)
     mouse_event.put(dy)
+
 
 def receive_and_put_in_list(client_socket, jpeg_list):
     size_of_header = 10
@@ -98,7 +98,7 @@ def receive_and_put_in_list(client_socket, jpeg_list):
     except ValueError:
         pass
     finally:
-        print("Thread2 automatically exits")
+        print("Thread automatically exits")
 
 
 def display_data(jpeg_list, status_list, disp_width, disp_height, resize):
@@ -133,8 +133,10 @@ def cleanup_process():
             if process.is_alive():
                 process.kill()
             process.join()
-    listener_mouse.stop()
-    listener_mouse.join()
+    mouse_listner.stop()
+    mouse_listner.join()
+    keyboard_listner.stop()
+    keyboard_listner.join()
     print("cleanup finished")
 
 
@@ -143,18 +145,17 @@ def cleanup_display_process(status_list):
         connection_common.send_data(command_server_socket, COMMAND_size_of_header, bytes("stop_capture", "utf-8"))
         cleanup_process()
 
+
 def remote_display():
-    global Thread2, listener_mouse, process1, process2, remote_server_socket, mouse_event
+    global Thread2, mouse_listner, process1, process2, remote_server_socket, mouse_event  ,keyboard_listner
     print("Sending start capture message")
     connection_common.send_data(command_server_socket, COMMAND_size_of_header, bytes("start_capture", "utf-8"))
     print("Sent start capture message")
     disable_choice = messagebox.askyesno("Remote Box", "Disable remote device wallpaper?(yes,Turn black)")
 
-    # remote display sockets
-    remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)     # remote display sockets
     remote_server_socket.connect((server_ip, server_port))
     
-    # print(f"Disable choice: {disable_choice}")
     connection_common.send_data(remote_server_socket, COMMAND_size_of_header, bytes(str(disable_choice), "utf-8"))
     print("\n")
     print(f">>Now you can CONTROL remote desktop")
@@ -163,7 +164,7 @@ def remote_display():
     client_resolution = connection_common.data_recive(remote_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
     client_width, client_height = client_resolution.split(",")
     display_width, display_height = int(client_width), int(client_height)
-    
+
 
     if (client_width, client_height) != (display_width, display_height):
         resize_option = True
@@ -172,39 +173,42 @@ def remote_display():
 
     Thread2 = Thread(target=receive_and_put_in_list, name="recv_stream", args=(remote_server_socket, jpeg_sync_queue), daemon=True)
     Thread2.start()
-
+  
     mouse_event = Multiprocess_queue()
 
-    process1 = Process(target=mouse_information, args=(remote_server_socket, mouse_event, resize_option, int(client_width), int(client_height), display_width, display_height), daemon=True)
+    process1 = Process(target=mouse_controlling, args=(remote_server_socket, mouse_event, resize_option, int(client_width), int(client_height), display_width, display_height), daemon=True)
     process1.start()
 
-    listener_mouse = Mouse_listener(on_move=on_move, on_click=on_click, on_scroll=on_scroll)
-    listener_mouse.start()
+    mouse_listner = Mouse_listener(on_move=on_move, on_click=on_click, on_scroll=on_scroll)
+    mouse_listner.start()
     
     execution_status_list = Multiprocess_queue()
     process2 = Process(target=display_data, args=(jpeg_sync_queue, execution_status_list, display_width, display_height , resize_option), daemon=True)
     process2.start()
+    
     Thread3 = Thread(target=cleanup_display_process, args=(execution_status_list,), daemon=True)
     Thread3.start()
+    
+    keyboard_listner = Key_listener(on_press=on_press, on_release=on_release)
+    keyboard_listner.start()
 
-
-def login():
+def connect():
     global command_server_socket, remote_server_socket, Thread1, server_ip, \
         server_port
 
     server_ip = name_entry.get()
     server_port = int(port_entry.get())
-    server_pass = password_entry.get()
-    if len(server_pass) == 6 and server_pass.strip() != "":
+    server_password = password_entry.get()
+    if len(server_password) == 6 and server_password.strip() != "":
         try:
             command_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             command_server_socket.connect((server_ip, server_port))
-            server_pass = bytes(server_pass, "utf-8")
-            connection_common.send_data(command_server_socket, 2, server_pass)  # send password
-            login_response = connection_common.data_recive(command_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
+            server_password = bytes(server_password, "utf-8")
+            connection_common.send_data(command_server_socket, 2, server_password)  # send password
+            connect_response = connection_common.data_recive(command_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
 
-            if login_response != "1":
-                print("Wrong Password Enterd...!")
+            if connect_response != "1":
+                print("Wrong Password Entered...!")
             else:
                 print("\n")
                 print("Connected to the remote desktop...!")
@@ -235,10 +239,9 @@ def close_sockets():
     print("All Sockets are closed now")
 
 
-def disconnect(caller):
-    if caller == "button":
+def disconnect(btn_caller):
+    if btn_caller == "button":
         connection_common.send_data(command_server_socket, COMMAND_size_of_header, bytes("disconnect", "utf-8"))
-
     close_sockets()
 
     # Enable
@@ -269,7 +272,26 @@ def listen_for_commands():
     finally:
         label_status.grid_remove()
         disconnect("message")
-        print("Thread1 automatically exit")
+        print("Thread automatically exit")
+
+def keyboard_controlling(key,event_code):
+    active_window = pygetwindow.getActiveWindow()
+    if active_window:
+        if active_window.title == f"Remote Desktop":
+            if key.char:
+                 msg = bytes(event_code + key.char, "utf-8") 
+                 send_event_to_remote(msg, remote_server_socket)
+            else:
+                msg = bytes(event_code + key.name, "utf-8") 
+                send_event_to_remote(msg, remote_server_socket)
+
+
+def on_press(key):
+    keyboard_controlling(key, "-1")
+
+
+def on_release(key):
+    keyboard_controlling(key, "-2")
 
 
 if __name__ == "__main__":
@@ -279,7 +301,8 @@ if __name__ == "__main__":
     remote_server_socket = None
     Thread1 = None
     Thread2 = None
-    listener_mouse = None
+    mouse_listner = None
+    keyboard_listner = None
     process1 = None
     process2 = None
     server_ip = str()
@@ -314,7 +337,7 @@ if __name__ == "__main__":
     form_frame.configure(font=title_font,background='#ADD8E6')
     form_frame.grid(row=1, column=0, padx=120, pady=(40, 20), sticky=tk.N)
 
-    # Form 
+    # Form details
     name_label = tk.Label(form_frame, text="IP", padx=1, pady=1)
     name_label.configure(font=title_font_normal,bg='#ADD8E6')
     name_label.grid(row=0, column=0, columnspan=2, pady=5, sticky=tk.W)
@@ -333,12 +356,14 @@ if __name__ == "__main__":
     password_entry = tk.Entry(form_frame, show="*", width=20)
     password_entry.configure(font=font_normal ,background="#E0FFFF")
     password_entry.grid(row=5, column=0, pady=5, columnspan=2, sticky=tk.N)
+    
+    # btn frame creation
     button_frame = tk.LabelFrame(form_frame, padx=2, pady=5, bd=0)
     button_frame.configure(bg='#ADD8E6')
     button_frame.grid(row=6, column=0, padx=5, pady=2)
 
     # Connect and Disconnect button design
-    connect_button = tk.Button(button_frame, text="Connect", padx=4, pady=1, command=login)
+    connect_button = tk.Button(button_frame, text="Connect", padx=4, pady=1, command=connect)
     connect_button.configure(font=title_font_normal,bg='brown',fg='white')
     connect_button.grid(row=0, column=0, sticky=tk.N, padx=5, pady=5)
     disconnect_button = tk.Button(button_frame, text="Disconnect", padx=2, pady=1, command=lambda: disconnect("button"))
@@ -347,16 +372,19 @@ if __name__ == "__main__":
 
     # Access Button Frame
     access_button_frame = tk.LabelFrame(connection_frame, text="Access", padx=5, pady=15)
-    access_button_frame.configure(font=title_font)
+    access_button_frame.configure(font=title_font, background='#ADD8E6')
     access_button_frame.grid(row=7, column=0, padx=10, pady=10, columnspan=2, sticky=tk.W+tk.E)
 
     # Disable access frame when not connected
     access_button_frame.grid_forget()
 
     # View Remote Box button
-    remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, padx=2,  pady=2, bd=0, command=remote_display)
-    remote_button.configure(font=font_normal)
-    remote_button.grid(row=0, column=1, sticky=tk.W, padx=30)  # padx =60
+    remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, padx=2, pady=2, bd=0, command=remote_display)
+    remote_button.configure(font=font_normal,background='#ADD8E6')
+    remote_button.grid(row=0, column=0, padx=30, pady=30, sticky=tk.NSEW)
+    
+    access_button_frame.columnconfigure(0, weight=1)
+    access_button_frame.rowconfigure(0, weight=1)
     
     # Status Label
     label_status = tk.Label(root, text="Connected", image=green, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E,  padx=10)
@@ -366,7 +394,9 @@ if __name__ == "__main__":
 
     # Create Tab style
     tab_style = ttk.Style()
-    tab_style.configure('TNotebook.Tab', font=('Arial', '13', 'bold'))
+    tab_style.configure('TNotebook.Tab',font=title_font)
     my_screen.add(connection_frame, text=" Connection ")
 
     root.mainloop()
+    
+    # FOR CHECKING - 192.168.1.167
