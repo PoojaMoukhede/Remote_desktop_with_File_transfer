@@ -321,58 +321,66 @@ if __name__ == "__main__":
     title_font = Font(size=13, family="Arial", weight="bold")
     title_font_normal = Font(size=12, family="Arial",weight="bold")
     font_normal = Font(size=12, family="Arial")
+    
+   
 
     # My Screen Notebook
     my_screen = ttk.Notebook(root)
     my_screen.grid(row=0, column=0, pady=5)
     connection_frame = tk.LabelFrame(my_screen, padx=100, pady=5, bd=0)
-    connection_frame.configure(bg='#ADD8E6')
+    connection_frame.configure(bg='whitesmoke')
     connection_frame.grid(row=0, column=0, padx=40, pady=40, sticky=tk.N)
+
+    img= Image.open('./assets/background.png')
+    resized_image= img.resize((700,400), Image.ANTIALIAS)
+    new_image= ImageTk.PhotoImage(resized_image)
+    label = tk.Label(connection_frame, image=new_image,background='white')
+    label.place(x=-100, y=0)
 
     label_note = tk.Label(connection_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, pady=5, columnspan=2, sticky=tk.N)
 
     # Form frame
-    form_frame = tk.LabelFrame(connection_frame, text="Control Remote Box", padx=20, pady=5)
-    form_frame.configure(font=title_font,background='#ADD8E6')
+    form_frame = tk.LabelFrame(connection_frame, text="Control Remote Box", padx=20, pady=5,fg='brown')
+    form_frame.configure(font=title_font,background='whitesmoke')
     form_frame.grid(row=1, column=0, padx=120, pady=(40, 20), sticky=tk.N)
 
     # Form details
     name_label = tk.Label(form_frame, text="IP", padx=1, pady=1)
-    name_label.configure(font=title_font_normal,bg='#ADD8E6')
+    name_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
     name_label.grid(row=0, column=0, columnspan=2, pady=5, sticky=tk.W)
     name_entry = tk.Entry(form_frame, width=20)
-    name_entry.configure(font=font_normal ,background="#E0FFFF")
+    name_entry.configure(font=font_normal ,background="white")
     name_entry.grid(row=1, column=0, pady=5, columnspan=2, sticky=tk.N)
     port_label = tk.Label(form_frame, text="PORT", padx=1, pady=1)
-    port_label.configure(font=title_font_normal,bg='#ADD8E6')
+    port_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
     port_label.grid(row=2, column=0, columnspan=2, pady=5, sticky=tk.W)
     port_entry = tk.Entry(form_frame, width=20)
-    port_entry.configure(font=font_normal ,background="#E0FFFF")
+    port_entry.configure(font=font_normal ,background="white")
     port_entry.grid(row=3, column=0, pady=5, columnspan=2, sticky=tk.N)
     password_label = tk.Label(form_frame, text="PASSWORD", padx=1, pady=1)
-    password_label.configure(font=title_font_normal,bg='#ADD8E6')
+    password_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
     password_label.grid(row=4, column=0, columnspan=2, pady=5, sticky=tk.W)
     password_entry = tk.Entry(form_frame, show="*", width=20)
-    password_entry.configure(font=font_normal ,background="#E0FFFF")
+    password_entry.configure(font=font_normal ,background="white")
     password_entry.grid(row=5, column=0, pady=5, columnspan=2, sticky=tk.N)
     
     # btn frame creation
     button_frame = tk.LabelFrame(form_frame, padx=2, pady=5, bd=0)
-    button_frame.configure(bg='#ADD8E6')
+    button_frame.configure(bg='whitesmoke')
     button_frame.grid(row=6, column=0, padx=5, pady=2)
 
     # Connect and Disconnect button design
     connect_button = tk.Button(button_frame, text="Connect", padx=4, pady=1, command=connect)
-    connect_button.configure(font=title_font_normal,bg='brown',fg='white')
+    connect_button.configure(font=title_font_normal,bg='red4',fg='white')
     connect_button.grid(row=0, column=0, sticky=tk.N, padx=5, pady=5)
     disconnect_button = tk.Button(button_frame, text="Disconnect", padx=2, pady=1, command=lambda: disconnect("button"))
-    disconnect_button.configure(font=title_font_normal, state=tk.DISABLED,bg='brown',fg='white')
+    disconnect_button.configure(font=title_font_normal, state=tk.DISABLED,bg='red4')
     disconnect_button.grid(row=0, column=1, sticky=tk.N, padx=5, pady=5)
 
     # Access Button Frame
     access_button_frame = tk.LabelFrame(connection_frame, text="Access", padx=5, pady=15)
-    access_button_frame.configure(font=title_font, background='#ADD8E6')
+    access_button_frame.configure(font=title_font, background='whitesmoke')
     access_button_frame.grid(row=7, column=0, padx=10, pady=10, columnspan=2, sticky=tk.W+tk.E)
 
     # Disable access frame when not connected
@@ -380,7 +388,7 @@ if __name__ == "__main__":
 
     # View Remote Box button
     remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, padx=2, pady=2, bd=0, command=remote_display)
-    remote_button.configure(font=font_normal,background='#ADD8E6')
+    remote_button.configure(font=font_normal,background='whitesmoke',fg='white')
     remote_button.grid(row=0, column=0, padx=30, pady=30, sticky=tk.NSEW)
     
     access_button_frame.columnconfigure(0, weight=1)
@@ -388,7 +396,7 @@ if __name__ == "__main__":
     
     # Status Label
     label_status = tk.Label(root, text="Connected", image=green, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E,  padx=10)
-    label_status.configure(font=font_normal,bg='#ADD8E6')
+    label_status.configure(font=font_normal,bg='whitesmoke',fg='brown')
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
     label_status.grid_remove()
 

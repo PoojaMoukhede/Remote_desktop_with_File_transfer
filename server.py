@@ -111,7 +111,7 @@ def Desktop_bg_path():
 def screen_sending():
     global process1, process2, process3, client_socket
     # remote display socket
-    client_socket, address = server_socket.accept()
+    client_socket = server_socket.accept()
     disable_wallpaper = connection_common.data_recive(client_socket, 2, bytes(), 1024)
     
     if disable_wallpaper[0].decode("utf-8") == "True":
@@ -369,17 +369,21 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.title("Remote Box")
     root.resizable(False, False)
-    # root.configure(0,0,image=bg_img)
 
     # My Screen Notebook
     my_screen = ttk.Notebook(root)
     my_screen.grid(row=0, column=0, pady=5, columnspan=2)
     listener_frame = tk.LabelFrame(my_screen)
-    listener_frame.configure(background='#ADD8E6')
     listener_frame.grid(row=0, column=0)
-
+    
+    # trying to set background image to root  
+    img= Image.open('./assets/background.png')
+    resized_image= img.resize((700,400), Image.ANTIALIAS)
+    new_image= ImageTk.PhotoImage(resized_image)
+    label = tk.Label(listener_frame, image=new_image,background='white')
+    label.place(x=0, y=0)
+    
     #Images
-    # remote = tk.PhotoImage(file='assets/remote-desktop.png') 
     yellow = tk.PhotoImage(file="assets/yellow_dot.png")
     green = tk.PhotoImage(file="assets/green_dot.png")
     red = tk.PhotoImage(file="assets/red_dot.png")
@@ -393,54 +397,54 @@ if __name__ == "__main__":
     title_font_normal = Font(family="Arial", size=13, weight="bold")
     normal_font = Font(family="Arial", size=13)
 
-    heading = tk.Label(listener_frame, text="Remote Control Access",font=heading_fort ,bg='#ADD8E6')  
+    heading = tk.Label(listener_frame, text="Remote Control Access",font=heading_fort ,bg='whitesmoke',fg='brown')  
     heading.place(x=150,y=43)  
 
     # Connection Frame
-    connection_frame = tk.LabelFrame(listener_frame, text="Connection Mode", padx=90, pady=30)
-    connection_frame.configure(font=title_font,background='#ADD8E6')
+    connection_frame = tk.LabelFrame(listener_frame, text="Connection Mode", padx=90, pady=30 ,fg='brown')
+    connection_frame.configure(font=title_font,background='whitesmoke')
     connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)
 
 
     radio_var = tk.IntVar()
     radio_var.set(1)
     radio_btn = tk.Radiobutton(connection_frame, text="IP", variable=radio_var, value=1)
-    radio_btn.configure(font=normal_font,background='#ADD8E6')
+    radio_btn.configure(font=normal_font,background='whitesmoke')
     radio_btn.grid(row=0, column=0, sticky=tk.W, padx=20, pady=5)
     start_btn = tk.Button(connection_frame, text="Start Listining", padx=2, pady=1, command=lambda: start_listining(radio_var.get()))
-    start_btn.configure(font=title_font_normal,bg='brown',fg='white')
+    start_btn.configure(font=title_font_normal,bg='red4',fg='white')
     start_btn.grid(row=2, column=0, sticky=tk.W, pady=(20, 2), padx=(20, 2))
 
     # Details Frame
-    details_frame = tk.LabelFrame(listener_frame, text="Allow Remote Access", padx=20, pady=20, labelanchor=tk.NE)
-    details_frame.configure(font=title_font,background='#ADD8E6')
+    details_frame = tk.LabelFrame(listener_frame, text="Allow Remote Access", padx=20, pady=20, labelanchor=tk.NE ,fg='brown')
+    details_frame.configure(font=title_font,background='whitesmoke')
     details_frame.grid(row=1, column=0, padx=40, pady=40)
     
 
     # Local IP Design
     local_ip_label = tk.Label(details_frame, text="LOCAL IP     :", padx=5, pady=5 )
-    local_ip_label.configure(font=title_font_normal,bg='#ADD8E6')
-    local_ip_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
+    local_ip_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
+    local_ip_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
     
     # # Public IP Design
     # public_ip_label = tk.Label(details_frame, text="PUBLIC IP    :", padx=5, pady=5)
-    # public_ip_label.configure(font=title_font_normal,bg='#ADD8E6')
-    # public_ip_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
+    # public_ip_label.configure(font=title_font_normal,bg='whitesmoke')
+    # public_ip_text = tk.Text(details_frame, background="#white",width=47, height=1,pady=5)
     
     # Device Name Design in diffrent network
     name_label = tk.Label(details_frame, text="Device Name :", padx=5, pady=5)
-    name_label.configure(font=title_font_normal,bg='#ADD8E6')
-    name_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
+    name_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
+    name_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
     
     # Port Design
     port_label = tk.Label(details_frame, text="PORT NO        :", padx=5, pady=5)
-    port_label.configure(font=title_font_normal,bg='#ADD8E6')
-    port_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
+    port_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
+    port_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
     
     # Password Design
     password_label = tk.Label(details_frame, text="PASSWORD   :", padx=5, pady=5)
-    password_label.configure(font=title_font_normal,bg='#ADD8E6')
-    password_text = tk.Text(details_frame, background="#E0FFFF",width=47, height=1,pady=5)
+    password_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
+    password_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
 
     stop_btn = tk.Button(details_frame, text="Stop Listining", padx=2, pady=1, command=lambda: stop_listining())
     stop_btn.configure(font=title_font_normal, state="disabled",bg='brown',fg='white')
@@ -449,19 +453,12 @@ if __name__ == "__main__":
     details_frame.grid_forget()
     
     label_status = tk.Label(root, text="Not Connected", image=red, compound=tk.LEFT, relief=tk.SUNKEN, anchor=tk.E, padx=10)
-    label_status.configure(font=normal_font,background='#ADD8E6')
+    label_status.configure(font=normal_font,background='whitesmoke',fg='brown')
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
-
-    # trying to set background image to root  
-
-    # img = tk.PhotoImage(file="./assets/helpcenter.png")
-    # label = tk.Label(root, image=img)
-    # label.place(x=30, y=30)
-
 
     # Create Tab 
     tab_style = ttk.Style()
     tab_style.configure('TNotebook.Tab', font=title_font_normal)
-    my_screen.add(listener_frame, text=" Connection ")
+    my_screen.add(listener_frame, text=" Remote Access Connection ")
 
     root.mainloop()
