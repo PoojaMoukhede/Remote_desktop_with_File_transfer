@@ -18,6 +18,9 @@ import tkinter as tk
 from tkinter.font import Font
 from tkinter import ttk
 from pynput.keyboard import Key, Controller as Keyboard_controller
+import sys
+from datetime import datetime
+
 
 def find_button(btn_code, event_Code):
     for key in btn_code.keys():
@@ -183,7 +186,6 @@ def start_listining(option_value):
     #random password generation uppercase + number and length is 6
     PASSWORD = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-
     if option_value == 1:
         server_ip = socket.gethostbyname(socket.gethostname())  # Local IP
 
@@ -336,7 +338,6 @@ def listinging_commands():
         login_thread.start()
         print("Thread1 automatically closed")
 
-
 if __name__ == "__main__":
     
     freeze_support()
@@ -367,10 +368,10 @@ if __name__ == "__main__":
     
     # trying to set background image to root  
     img= Image.open('./assets/background.png')
-    # resized_image= img.resize((700,400), Image.ANTIALIAS)
-    # new_image= ImageTk.PhotoImage(resized_image)
-    # label = tk.Label(listener_frame, image=new_image,background='white')
-    # label.place(x=0, y=0)
+    resized_image= img.resize((700,400), Image.ANTIALIAS)
+    new_image= ImageTk.PhotoImage(resized_image)
+    label = tk.Label(listener_frame, image=new_image,background='white')
+    label.place(x=0, y=0)
     
     #Images
     yellow = tk.PhotoImage(file="assets/yellow_dot.png")
@@ -446,4 +447,16 @@ if __name__ == "__main__":
     my_screen.add(listener_frame, text=" Remote Access Connection ")
 
     root.mainloop()
+    
+expiration_time = datetime.datetime.now() + datetime.timedelta(hours=1)
+while True:
+    # Get the current time
+    current_time = datetime.datetime.now()
+
+    # Check if the password has expired
+    if current_time > expiration_time:
+        print("Password has expired. Exiting application.")
+        sys.exit()
+
+time.sleep(1)
 

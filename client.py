@@ -339,11 +339,11 @@ if __name__ == "__main__":
     connection_frame.configure(bg='whitesmoke')
     connection_frame.grid(row=0, column=0, padx=40, pady=40, sticky=tk.N)
 
-    # img= Image.open('./assets/background.png')
-    # resized_image= img.resize((700,400), Image.LANCZOS)
-    # new_image= ImageTk.PhotoImage(resized_image)
-    # label = tk.Label(connection_frame, image=new_image,background='white')
-    # label.place(x=-100, y=0)
+    img= Image.open('./assets/background.png')
+    resized_image= img.resize((700,400), Image.LANCZOS)
+    new_image= ImageTk.PhotoImage(resized_image)
+    label = tk.Label(connection_frame, image=new_image,background='white')
+    label.place(x=-100, y=0)
 
     label_note = tk.Label(connection_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, pady=5, columnspan=2, sticky=tk.N)
