@@ -1,22 +1,27 @@
 import socket
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-from tkinter.font import Font
-import connection_common  # import file which has data recive and send function
 from PIL import Image, ImageGrab, ImageTk
 import pygetwindow
-from pynput.mouse import Button, Listener as Mouse_listener
-import win32gui
 import os
-from io import BytesIO
-import pygame
+import win32gui
 import lz4.frame
+from io import BytesIO
 from threading import Thread
 from multiprocessing import freeze_support, Process, Queue as Multiprocess_queue
 from pynput.keyboard import Listener as Key_listener
+from pynput.mouse import Button, Listener as Mouse_listener
+import tkinter as tk
+from tkinter.font import Font
+from tkinter import ttk, messagebox, filedialog
+import connection_common
+import win32api
+from datetime import datetime
+import pygame
 
-def send_event_to_remote(message, sock):
+
+def send_event(sock,message):
     connection_common.send_data(sock, 2, message)
+    # print(sock,'----sock')
+    # print(message,'----message')
 
 def mouse_controlling(sock, event_queue, resize, cli_width, cli_height, disp_width, disp_height):
     while True:
@@ -30,11 +35,11 @@ def mouse_controlling(sock, event_queue, resize, cli_width, cli_height, disp_wid
                     x = event_queue.get()
                     y = event_queue.get()
                 message = bytes(f"{event_code:<2}" + str(x) + "," + str(y), "utf-8")
-                send_event_to_remote(message, sock)
+                send_event(sock,message)
         elif event_code in range(1, 10):
             if inside_the_display:
                 message = bytes(f"{event_code:<2}", "utf-8")
-                send_event_to_remote(message, sock)
+                send_event(sock,message)
 
 
 def XY_scale(x, y, cli_width, cli_height, disp_width, disp_height):
@@ -57,7 +62,6 @@ def check_in_display(x, y, resize, cli_width, cli_height, disp_width, disp_heigh
             return x, y, True
     return x, y, False
 
-
 def on_move(x, y):
     mouse_event.put(0)  
     mouse_event.put(x)
@@ -74,7 +78,6 @@ def on_click(x, y, button, pressed):
         mouse_event.put(x)
         mouse_event.put(y)
 
-
 def on_scroll(x, y, dx, dy):
     mouse_event.put(7) 
     mouse_event.put(x)
@@ -84,9 +87,9 @@ def on_scroll(x, y, dx, dy):
 
 
 def receive_and_put_in_list(client_socket, jpeg_list):
-    size_of_header = 10
     chunk_prev_message = bytes()
-
+    size_of_header = 10
+    
     try:
         while True:
             message = connection_common.data_recive(client_socket, size_of_header, chunk_prev_message)
@@ -98,7 +101,7 @@ def receive_and_put_in_list(client_socket, jpeg_list):
     except ValueError:
         pass
     finally:
-        print("Thread automatically exits")
+        print("Thread automatically closed")
 
 
 def display_data(jpeg_list, status_list, disp_width, disp_height, resize):
@@ -112,7 +115,7 @@ def display_data(jpeg_list, status_list, disp_width, disp_height, resize):
     while display:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                status_list.put("stop")
+                status_list.put("stop")  
                 pygame.quit()
                 return
         jpeg_buffer = BytesIO(jpeg_list.get())
@@ -142,38 +145,47 @@ def cleanup_process():
 
 def cleanup_display_process(status_list):
     if status_list.get() == "stop":
-        connection_common.send_data(command_server_socket, COMMAND_size_of_header, bytes("stop_capture", "utf-8"))
+        connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("stop_capture", "utf-8"))
         cleanup_process()
 
 
 def remote_display():
-    global Thread2, mouse_listner, process1, process2, remote_server_socket, mouse_event  ,keyboard_listner
-    print("Sending start capture message")
-    connection_common.send_data(command_server_socket, COMMAND_size_of_header, bytes("start_capture", "utf-8"))
-    print("Sent start capture message")
+    global thread2, mouse_listner,keyboard_listner, process1, process2, remote_server_socket, mouse_event  
+    print("Send start message")
+    connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("start_capture", "utf-8"))
+    print("Start message sent")
     disable_choice = messagebox.askyesno("Remote Box", "Disable remote device wallpaper?(yes,Turn black)")
 
     remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)     # remote display sockets
+    # print(remote_server_socket,"----remote display socket")
     remote_server_socket.connect((server_ip, server_port))
     
-    connection_common.send_data(remote_server_socket, COMMAND_size_of_header, bytes(str(disable_choice), "utf-8"))
+    connection_common.send_data(remote_server_socket, HEADER_COMMAND_SIZE, bytes(str(disable_choice), "utf-8"))
     print("\n")
     print(f">>Now you can CONTROL remote desktop")
     resize_option = False
-    server_width, server_height = ImageGrab.grab().size
     client_resolution = connection_common.data_recive(remote_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
-    client_width, client_height = client_resolution.split(",")
+    print("Received client_resolution :", client_resolution)
+    # client_width, client_height = client_resolution.split(",")
+    
+    try:
+     client_width, client_height = client_resolution.split(",")
+    except ValueError:
+     client_width, client_height = 1920,1020 
+        
     display_width, display_height = int(client_width), int(client_height)
-
 
     if (client_width, client_height) != (display_width, display_height):
         resize_option = True
 
-    jpeg_sync_queue = Multiprocess_queue()
+    jpeg_sync_queue = Multiprocess_queue()  
 
-    Thread2 = Thread(target=receive_and_put_in_list, name="recv_stream", args=(remote_server_socket, jpeg_sync_queue), daemon=True)
-    Thread2.start()
-  
+    thread2 = Thread(target=receive_and_put_in_list, name="recv_stream", args=(remote_server_socket, jpeg_sync_queue), daemon=True)
+    thread2.start()
+    
+    keyboard_listner = Key_listener(on_press=on_press, on_release=on_release)
+    keyboard_listner.start()
+    
     mouse_event = Multiprocess_queue()
 
     process1 = Process(target=mouse_controlling, args=(remote_server_socket, mouse_event, resize_option, int(client_width), int(client_height), display_width, display_height), daemon=True)
@@ -183,17 +195,17 @@ def remote_display():
     mouse_listner.start()
     
     execution_status_list = Multiprocess_queue()
+    
     process2 = Process(target=display_data, args=(jpeg_sync_queue, execution_status_list, display_width, display_height , resize_option), daemon=True)
     process2.start()
     
-    Thread3 = Thread(target=cleanup_display_process, args=(execution_status_list,), daemon=True)
-    Thread3.start()
+    thread3 = Thread(target=cleanup_display_process, args=(execution_status_list,), daemon=True)
+    thread3.start()
     
-    keyboard_listner = Key_listener(on_press=on_press, on_release=on_release)
-    keyboard_listner.start()
+   
 
-def connect():
-    global command_server_socket, remote_server_socket, Thread1, server_ip, \
+def login_to_connect():
+    global command_server_socket, remote_server_socket, thread1, server_ip, \
         server_port
 
     server_ip = name_entry.get()
@@ -213,8 +225,8 @@ def connect():
                 print("\n")
                 print("Connected to the remote desktop...!")
                 label_status.grid()
-                Thread1 = Thread(target=listen_for_commands, daemon=True)
-                Thread1.start()
+                thread1 = Thread(target=listen_for_commands, daemon=True)
+                thread1.start()
                 
                 disconnect_button.configure(state="normal")   # Enable
                 access_button_frame.grid(row=7, column=0, padx=45, pady=20, columnspan=2, sticky=tk.W + tk.E)
@@ -236,12 +248,13 @@ def close_sockets():
     for sock in service_socket_list:
         if sock:
             sock.close()
-    print("All Sockets are closed now")
+    print("Both Sockets are closed now")
 
 
 def disconnect(btn_caller):
     if btn_caller == "button":
-        connection_common.send_data(command_server_socket, COMMAND_size_of_header, bytes("disconnect", "utf-8"))
+        connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("disconnect", "utf-8"))
+    
     close_sockets()
 
     # Enable
@@ -254,15 +267,12 @@ def disconnect(btn_caller):
     disconnect_button.configure(state="disabled")
     label_status.grid_remove()
     access_button_frame.grid_forget()
-    my_screen.hide(1)
-    my_screen.hide(2)
-
 
 def listen_for_commands():
     listen = True
     try:
         while listen:
-            message = connection_common.data_recive(command_server_socket, COMMAND_size_of_header, bytes(), 1024)[0].decode("utf-8")
+            message = connection_common.data_recive(command_server_socket, HEADER_COMMAND_SIZE, bytes(), 1024)[0].decode("utf-8")
             if message == "disconnect":
                 listen = False
     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
@@ -274,17 +284,14 @@ def listen_for_commands():
         disconnect("message")
         print("Thread automatically exit")
 
-def keyboard_controlling(key,event_code):
+def keyboard_controlling(key, event_code):
     active_window = pygetwindow.getActiveWindow()
-    if active_window:
-        if active_window.title == f"Remote Desktop":
-            if key.char:
-                 msg = bytes(event_code + key.char, "utf-8") 
-                 send_event_to_remote(msg, remote_server_socket)
-            else:
-                msg = bytes(event_code + key.name, "utf-8") 
-                send_event_to_remote(msg, remote_server_socket)
-
+    if active_window and active_window.title == "Remote Desktop":
+        if hasattr(key, "char"):
+            msg = bytes(event_code + key.char, "utf-8")
+        else:
+            msg = bytes(event_code + key.name, "utf-8")
+        send_event(msg, remote_server_socket)
 
 def on_press(key):
     keyboard_controlling(key, "-1")
@@ -299,8 +306,8 @@ if __name__ == "__main__":
     freeze_support()
     command_server_socket = None
     remote_server_socket = None
-    Thread1 = None
-    Thread2 = None
+    thread1 = None
+    thread2 = None
     mouse_listner = None
     keyboard_listner = None
     process1 = None
@@ -308,7 +315,7 @@ if __name__ == "__main__":
     server_ip = str()
     server_port = int()
     status_event_log = 1
-    COMMAND_size_of_header = 2
+    HEADER_COMMAND_SIZE = 2
     button_code = {Button.left: (1, 4), Button.right: (2, 5), Button.middle: (3, 6)}
 
     root = tk.Tk()
@@ -331,11 +338,11 @@ if __name__ == "__main__":
     connection_frame.configure(bg='whitesmoke')
     connection_frame.grid(row=0, column=0, padx=40, pady=40, sticky=tk.N)
 
-    img= Image.open('./assets/background.png')
-    resized_image= img.resize((700,400), Image.ANTIALIAS)
-    new_image= ImageTk.PhotoImage(resized_image)
-    label = tk.Label(connection_frame, image=new_image,background='white')
-    label.place(x=-100, y=0)
+    # img= Image.open('./assets/background.png')
+    # resized_image= img.resize((700,400), Image.LANCZOS)
+    # new_image= ImageTk.PhotoImage(resized_image)
+    # label = tk.Label(connection_frame, image=new_image,background='white')
+    # label.place(x=-100, y=0)
 
     label_note = tk.Label(connection_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, pady=5, columnspan=2, sticky=tk.N)
@@ -371,7 +378,7 @@ if __name__ == "__main__":
     button_frame.grid(row=6, column=0, padx=5, pady=2)
 
     # Connect and Disconnect button design
-    connect_button = tk.Button(button_frame, text="Connect", padx=4, pady=1, command=connect)
+    connect_button = tk.Button(button_frame, text="Connect", padx=4, pady=1, command=login_to_connect)
     connect_button.configure(font=title_font_normal,bg='red4',fg='white')
     connect_button.grid(row=0, column=0, sticky=tk.N, padx=5, pady=5)
     disconnect_button = tk.Button(button_frame, text="Disconnect", padx=2, pady=1, command=lambda: disconnect("button"))

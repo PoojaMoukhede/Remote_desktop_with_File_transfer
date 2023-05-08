@@ -2,10 +2,9 @@ import socket
 import mss
 import connection_common  # import file which has data recive and send function
 import os
-import ctypes
+import ctypes 
 import string
 import random
-import requests
 import re
 import lz4.frame
 from PIL import Image,  ImageGrab, ImageTk
@@ -13,14 +12,12 @@ from io import BytesIO
 from threading import Thread
 from multiprocessing import Process, Queue, freeze_support
 from pynput.mouse import Button, Controller as Mouse_controller
-from pynput.keyboard import Key, Controller as Keyboard_controller
 from pyngrok import ngrok, conf
 from pyngrok.conf import PyngrokConfig
 import tkinter as tk
 from tkinter.font import Font
 from tkinter import ttk
-import sys
-
+from pynput.keyboard import Key, Controller as Keyboard_controller
 
 def find_button(btn_code, event_Code):
     for key in btn_code.keys():
@@ -68,11 +65,12 @@ def event_recived(sock):
             msg = connection_common.data_recive(sock, size_of_header, prev_msg, 1024)
             if msg:
                 data = msg[0].decode("utf-8")
+                print(data,'inside event recieve')
                 event_Code = int(data[:2])
                 simulate(mouse, keyboard, btn_code, key_map, event_Code, data[2:])     
                 prev_msg = msg[1]                                               
-    except (ConnectionAbortedError, ConnectionResetError, OSError) as exception_object:
-        print(exception_object.strerror)
+    except (ConnectionAbortedError, OSError, ConnectionResetError):
+        pass
 
 
 def take_screenshot(screenshot_list, cli_width, cli_height):
@@ -109,10 +107,10 @@ def Desktop_bg_path():
         return None
     
 def screen_sending():
-    global process1, process2, process3, client_socket
+    global process1, process2, process3, client_socket_remote
     # remote display socket
-    client_socket = server_socket.accept()
-    disable_wallpaper = connection_common.data_recive(client_socket, 2, bytes(), 1024)
+    client_socket_remote , address = server_socket.accept()
+    disable_wallpaper = connection_common.data_recive(client_socket_remote, 2, bytes(), 1024)
     
     if disable_wallpaper[0].decode("utf-8") == "True":
         print("")
@@ -120,16 +118,16 @@ def screen_sending():
 
     cli_width, cli_height = ImageGrab.grab().size
     resolution_msg = bytes(str(cli_width) + "," + str(cli_height), "utf-8")
-    connection_common.send_data(client_socket, 2, resolution_msg)
+    connection_common.send_data(client_socket_remote, 2, resolution_msg)
 
     screenshot_sync_queue = Queue(1)
     process1 = Process(target=take_screenshot, args=(screenshot_sync_queue, cli_width, cli_height), daemon=True)
     process1.start()
 
-    process2 = Process(target=take_from_list_and_send, args=(screenshot_sync_queue, client_socket), daemon=True)
+    process2 = Process(target=take_from_list_and_send, args=(screenshot_sync_queue, client_socket_remote), daemon=True)
     process2.start()
 
-    process3 = Process(target=event_recived, args=(client_socket, PATH))
+    process3 = Process(target=event_recived, args=(client_socket_remote, PATH))
     process3.start()
 
 # ngrok config add-authtoken 2PEqo20xDqkICGPDLL8YNAh95l5_2zEmAiLSCPLh6qAjf9JWc
@@ -152,16 +150,19 @@ def socket_listener_create(server_ip, server_port):
     sock.listen(1)
     return sock
 
-
+    
 def close_socket():
-    service_socket_list = [command_client_socket, client_socket]
+    service_socket_list = [command_client_socket, client_socket_remote]
     for sock in service_socket_list:
+        if isinstance(sock, tuple):
+            continue
         if sock:
             sock.close()
+            print('sock.close()')
     if url:
         ngrok.kill()    
         # kill means ngrok disconnect   
-    print("sockets cleaned up")
+    print("sockets cleaned up")    
 
 
 def process_cleanup():
@@ -175,7 +176,7 @@ def process_cleanup():
 
 
 def start_listining(option_value):
-    global client_socket, server_socket, PASSWORD, login_thread
+    global client_socket_remote, server_socket, PASSWORD, login_thread
     # Disable buttons
     start_btn.configure(state=tk.DISABLED)
     radio_btn.configure(state=tk.DISABLED)
@@ -184,23 +185,15 @@ def start_listining(option_value):
     #random password generation uppercase + number and length is 6
     PASSWORD = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
+
     if option_value == 1:
         server_ip = socket.gethostbyname(socket.gethostname())  # Local IP
-        # public_ip = requests.get('https://api.ipify.org').text
-
 
         # Local IP details
         local_ip_label.grid(row=0, column=0, sticky=tk.W, pady=2)
         local_ip_text.insert(1.0, "{:<15} (Works when on same wifi or network)".format(server_ip))
         local_ip_text.configure(font=normal_font, state='disabled')
         local_ip_text.grid(row=0, column=1, sticky=tk.W, pady=2)
-
-        # # Public IP details
-        # public_ip_label.grid(row=1, column=0, sticky=tk.W, pady=2)
-        # public_ip_text.insert(1.0, "{:<15} (Works when on different network)"  .format(public_ip))
-        # public_ip_text.configure(font=normal_font, state='disabled')
-        # public_ip_text.grid(row=1, column=1, sticky=tk.W, pady=2)
-
         # Port details
         port_label.grid(row=2, column=0, sticky=tk.W, pady=2)
         port_text.insert(1.0, "{:<15}".format(SERVER_PORT))
@@ -238,7 +231,7 @@ def start_listining(option_value):
         stop_btn.grid(row=3, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
 
     server_socket = socket_listener_create(server_ip, SERVER_PORT)
-    login_thread = Thread(target=login, name="login_thread", args=(server_socket,), daemon=True)
+    login_thread = Thread(target=login_to_connect, name="login_thread", args=(server_socket,), daemon=True)
     login_thread.start()
 
     # Enable button
@@ -247,13 +240,14 @@ def start_listining(option_value):
 
 
 def stop_listining():
-    global server_socket, client_socket, url
+    global server_socket, client_socket_remote, url
     if IS_CLIENT_CONNECTED:
-        connection_common.send_data(command_client_socket, COMMAND_size_of_header, bytes("disconnect", "utf-8"))
+        connection_common.send_data(command_client_socket, HEADER_COMMAND_SIZE, bytes("disconnect", "utf-8"))
         
     # Closing all the sockets
     if server_socket:
         server_socket.close()
+        print("i am server close function")
     close_socket()
     process_cleanup()
 
@@ -262,10 +256,6 @@ def stop_listining():
         local_ip_text.grid_forget()
         local_ip_text.configure(state="normal")
         local_ip_text.delete('1.0', tk.END)
-        # public_ip_label.grid_forget()
-        # public_ip_text.grid_forget()
-        # public_ip_text.configure(state="normal")
-        # public_ip_text.delete('1.0', tk.END)
     elif radio_var.get() == 2:
         name_label.grid_forget()
         name_text.grid_forget()
@@ -290,8 +280,8 @@ def stop_listining():
     password_text.configure(state="normal")
     password_text.delete('1.0', tk.END)
 
-def login(sock):
-    global command_client_socket, client_socket, thread1, \
+def login_to_connect(sock):
+    global command_client_socket, client_socket_remote, thread1, \
         IS_CLIENT_CONNECTED
     accept = True
     try:
@@ -308,7 +298,7 @@ def login(sock):
                 print("\n")
                 print(f"Connection from {address[0]} has been connected!")
                 label_status.configure(font=normal_font, text="Connected", image=green)
-                thread1 = Thread(target=listinging_commands, name="listener_for_commands", daemon=True)   # thread for listening command
+                thread1 = Thread(target=listinging_commands, name="listinging_commands", daemon=True)   # thread for listening command
                 thread1.start()
                 IS_CLIENT_CONNECTED = True
                 accept = False
@@ -316,9 +306,10 @@ def login(sock):
                 connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))  
                 print(f"{address[0]}...Please enter correct password")
                 command_client_socket.close()
-    except (ConnectionAbortedError, ConnectionResetError, OSError) as e:
+                print("command_client_socket.close()")
+    except (ConnectionAbortedError, ConnectionResetError, OSError):
         label_status.configure(font=normal_font, text="Not Connected", image=red)
-        print(e.strerror)
+
 
 
 def listinging_commands():
@@ -326,7 +317,7 @@ def listinging_commands():
     listen = True
     try:
         while listen:
-            msg = connection_common.data_recive(command_client_socket, COMMAND_size_of_header, bytes(), 1024)[0].decode("utf-8")
+            msg = connection_common.data_recive(command_client_socket, HEADER_COMMAND_SIZE, bytes(), 1024)[0].decode("utf-8")
             print(f"Message received:{msg}")
             if msg == "start_capture":
                 screen_sending()
@@ -343,9 +334,9 @@ def listinging_commands():
         IS_CLIENT_CONNECTED = False
         close_socket()
         process_cleanup()
-        login_thread = Thread(target=login, name="login_thread", args=(server_socket,), daemon=True)
+        login_thread = Thread(target=login_to_connect, name="login_to_connect", args=(server_socket,), daemon=True)
         login_thread.start()
-        print("Thread1 automatically exits")
+        print("Thread1 automatically closed")
 
 
 if __name__ == "__main__":
@@ -353,7 +344,7 @@ if __name__ == "__main__":
     freeze_support()
     PATH = Desktop_bg_path()
     server_socket = None
-    client_socket = None
+    client_socket_remote = None
     command_client_socket = None
     thread1 = None
     login_thread = None
@@ -363,7 +354,7 @@ if __name__ == "__main__":
     PASSWORD = str()
     url = str()
     SERVER_PORT = 1234
-    COMMAND_size_of_header = 2
+    HEADER_COMMAND_SIZE = 2
     IS_CLIENT_CONNECTED = False
 
     root = tk.Tk()
@@ -378,16 +369,15 @@ if __name__ == "__main__":
     
     # trying to set background image to root  
     img= Image.open('./assets/background.png')
-    resized_image= img.resize((700,400), Image.ANTIALIAS)
-    new_image= ImageTk.PhotoImage(resized_image)
-    label = tk.Label(listener_frame, image=new_image,background='white')
-    label.place(x=0, y=0)
+    # resized_image= img.resize((700,400), Image.ANTIALIAS)
+    # new_image= ImageTk.PhotoImage(resized_image)
+    # label = tk.Label(listener_frame, image=new_image,background='white')
+    # label.place(x=0, y=0)
     
     #Images
     yellow = tk.PhotoImage(file="assets/yellow_dot.png")
     green = tk.PhotoImage(file="assets/green_dot.png")
     red = tk.PhotoImage(file="assets/red_dot.png")
-    bg_img = tk.PhotoImage(file='assets/helpcenter.png')
 
     label_note = tk.Label(listener_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, padx=200, pady=5, columnspan=2, sticky=tk.N)
@@ -426,10 +416,6 @@ if __name__ == "__main__":
     local_ip_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
     local_ip_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
     
-    # # Public IP Design
-    # public_ip_label = tk.Label(details_frame, text="PUBLIC IP    :", padx=5, pady=5)
-    # public_ip_label.configure(font=title_font_normal,bg='whitesmoke')
-    # public_ip_text = tk.Text(details_frame, background="#white",width=47, height=1,pady=5)
     
     # Device Name Design in diffrent network
     name_label = tk.Label(details_frame, text="Device Name :", padx=5, pady=5)
@@ -462,3 +448,4 @@ if __name__ == "__main__":
     my_screen.add(listener_frame, text=" Remote Access Connection ")
 
     root.mainloop()
+
