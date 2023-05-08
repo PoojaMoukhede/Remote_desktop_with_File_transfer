@@ -24,7 +24,6 @@ def find_button(btn_code, event_Code):
         if event_Code in key:
             return btn_code.get(key)
         
-       
 def simulate(mouse, keyboard, btn_code, key_map, event_Code, msg):
     if event_Code == -1:
         if len(msg) == 1:
@@ -48,7 +47,7 @@ def simulate(mouse, keyboard, btn_code, key_map, event_Code, msg):
         mouse.release(find_button(btn_code, event_Code))
 
 
-def event_recived(sock):
+def event_recived(sock,wallpaper_path):
     mouse = Mouse_controller()
     btn_code = {(1, 4): Button.left, (2, 5): Button.right, (3, 6): Button.middle}
 
@@ -69,9 +68,8 @@ def event_recived(sock):
                 event_Code = int(data[:2])
                 simulate(mouse, keyboard, btn_code, key_map, event_Code, data[2:])     
                 prev_msg = msg[1]                                               
-    except (ConnectionAbortedError, OSError, ConnectionResetError):
-        pass
-
+    except (ConnectionAbortedError, OSError, ConnectionResetError) as e:
+        print(e.strerror)
 
 def take_screenshot(screenshot_list, cli_width, cli_height):
     sct = mss.mss()

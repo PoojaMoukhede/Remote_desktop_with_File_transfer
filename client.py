@@ -85,6 +85,23 @@ def on_scroll(x, y, dx, dy):
     mouse_event.put(dx)
     mouse_event.put(dy)
 
+def keyboard_controlling(key, event_code):
+    active_window = pygetwindow.getActiveWindow()
+    if active_window and active_window.title == "Remote Desktop":
+        if hasattr(key, "char"):
+            msg = bytes(event_code + key.char, "utf-8")
+        else:
+            msg = bytes(event_code + key.name, "utf-8")
+        send_event(remote_server_socket,msg)
+
+def on_press(key):
+    keyboard_controlling(key, "-1")  # -1 indicate a key press event
+
+
+def on_release(key):
+    keyboard_controlling(key, "-2")   # -2 indicate a key release event.
+
+
 
 def receive_and_put_in_list(client_socket, jpeg_list):
     chunk_prev_message = bytes()
@@ -283,22 +300,6 @@ def listen_for_commands():
         label_status.grid_remove()
         disconnect("message")
         print("Thread automatically exit")
-
-def keyboard_controlling(key, event_code):
-    active_window = pygetwindow.getActiveWindow()
-    if active_window and active_window.title == "Remote Desktop":
-        if hasattr(key, "char"):
-            msg = bytes(event_code + key.char, "utf-8")
-        else:
-            msg = bytes(event_code + key.name, "utf-8")
-        send_event(msg, remote_server_socket)
-
-def on_press(key):
-    keyboard_controlling(key, "-1")
-
-
-def on_release(key):
-    keyboard_controlling(key, "-2")
 
 
 if __name__ == "__main__":
