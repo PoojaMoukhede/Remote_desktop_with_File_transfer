@@ -12,14 +12,13 @@ from io import BytesIO
 from threading import Thread
 from multiprocessing import Process, Queue, freeze_support
 from pynput.mouse import Button, Controller as Mouse_controller
-from pyngrok import ngrok, conf
 from pyngrok.conf import PyngrokConfig
 import tkinter as tk
 from tkinter.font import Font
 from tkinter import ttk
 from pynput.keyboard import Key, Controller as Keyboard_controller
-import sys
-from datetime import datetime
+import random
+
 
 
 def find_button(btn_code, event_Code):
@@ -67,7 +66,7 @@ def event_recived(sock,wallpaper_path):
             msg = connection_common.data_recive(sock, size_of_header, prev_msg, 1024)
             if msg:
                 data = msg[0].decode("utf-8")
-                print(data,'inside event recieve')
+                # print(data,'inside event recieve')
                 event_Code = int(data[:2])
                 simulate(mouse, keyboard, btn_code, key_map, event_Code, data[2:])     
                 prev_msg = msg[1]                                               
@@ -131,20 +130,6 @@ def screen_sending():
     process3 = Process(target=event_recived, args=(client_socket_remote, PATH))
     process3.start()
 
-# ngrok config add-authtoken 2PEqo20xDqkICGPDLL8YNAh95l5_2zEmAiLSCPLh6qAjf9JWc
-
-def setup_ngrok():
-    global url
-    conf.DEFAULT_PYNGROK_CONFIG = PyngrokConfig(region="in", ngrok_path="{}".format(os.getenv('APPDATA') +    r'\RemoteApplication\ngrok.exe'))
-    # pyngrok_config = PyngrokConfig(region="in")
-    ngrok.set_auth_token("2PEqo20xDqkICGPDLL8YNAh95l5_2zEmAiLSCPLh6qAjf9JWc")
-    
-    url = ngrok.connect(SERVER_PORT, "tcp", pyngrok_config=conf.DEFAULT_PYNGROK_CONFIG)
-    device_name = re.search(r"//(.+):", url).group(1)
-    port_no = re.search(r":(\d+)", url).group(1)
-    return device_name, port_no
-
-
 def socket_listener_create(server_ip, server_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((server_ip, server_port))
@@ -159,10 +144,7 @@ def close_socket():
             continue
         if sock:
             sock.close()
-            print('sock.close()')
-    if url:
-        ngrok.kill()    
-        # kill means ngrok disconnect   
+            # print('sock.close()')
     print("sockets cleaned up")    
 
 
@@ -174,6 +156,19 @@ def process_cleanup():
                 process.kill()
             process.join()
     print("Remote controlled capture stopped due to process cleanup.")
+
+# def generate_password():
+#     PASSWORD = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+#     current_time = datetime.datetime.now()
+
+#     # Set the expiration time to 1 hour from now
+#     expiration_time = current_time + datetime.timedelta(minutes=1)
+#     if current_time == expiration_time:
+#       print("password expire")
+#       close_socket()
+#       process_cleanup()
+      
+#     return PASSWORD, expiration_time
 
 
 def start_listining(option_value):
@@ -207,29 +202,6 @@ def start_listining(option_value):
         password_text.grid(row=3, column=1, sticky=tk.W, pady=2)
         stop_btn.grid(row=4, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
 
-    else:
-        server_ip = "127.0.0.1"
-        server_name, port = setup_ngrok()
-
-        # Device Name details
-        name_label.grid(row=0, column=0, sticky=tk.W, pady=2)
-        name_text.insert(1.0, "{:<15} (Works In any network)".format(server_name))
-        name_text.configure(font=normal_font, state='disabled')
-        name_text.grid(row=0, column=1, sticky=tk.W, pady=2)
-
-        # Port details
-        port_label.grid(row=1, column=0, sticky=tk.W, pady=2)
-        port_text.insert(1.0, "{:<15}".format(port))
-        port_text.configure(font=normal_font, state='disabled')
-        port_text.grid(row=1, column=1, sticky=tk.W, pady=2)
-
-        # Password Details
-        password_label.grid(row=2, column=0, sticky=tk.W, pady=2)
-        password_text.insert(1.0, "{:<15}".format(PASSWORD))
-        password_text.configure(font=normal_font, state='disabled')
-        password_text.grid(row=2, column=1, sticky=tk.W, pady=2)
-        stop_btn.grid(row=3, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
-
     server_socket = socket_listener_create(server_ip, SERVER_PORT)
     login_thread = Thread(target=login_to_connect, name="login_thread", args=(server_socket,), daemon=True)
     login_thread.start()
@@ -256,11 +228,6 @@ def stop_listining():
         local_ip_text.grid_forget()
         local_ip_text.configure(state="normal")
         local_ip_text.delete('1.0', tk.END)
-    elif radio_var.get() == 2:
-        name_label.grid_forget()
-        name_text.grid_forget()
-        name_text.configure(state="normal")
-        name_text.delete('1.0', tk.END)
     label_status.configure(font=normal_font, text="Not Connected", image=red)
    
     connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)  # Enable buttons
@@ -411,15 +378,10 @@ if __name__ == "__main__":
     
 
     # Local IP Design
-    local_ip_label = tk.Label(details_frame, text="LOCAL IP     :", padx=5, pady=5 )
+    local_ip_label = tk.Label(details_frame, text="LOCAL IP       :", padx=5, pady=5 )
     local_ip_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
     local_ip_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
     
-    
-    # Device Name Design in diffrent network
-    name_label = tk.Label(details_frame, text="Device Name :", padx=5, pady=5)
-    name_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
-    name_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
     
     # Port Design
     port_label = tk.Label(details_frame, text="PORT NO        :", padx=5, pady=5)
@@ -427,7 +389,7 @@ if __name__ == "__main__":
     port_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
     
     # Password Design
-    password_label = tk.Label(details_frame, text="PASSWORD   :", padx=5, pady=5)
+    password_label = tk.Label(details_frame, text="PASSWORD    :", padx=5, pady=5)
     password_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
     password_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
 
@@ -448,15 +410,3 @@ if __name__ == "__main__":
 
     root.mainloop()
     
-expiration_time = datetime.datetime.now() + datetime.timedelta(hours=1)
-while True:
-    # Get the current time
-    current_time = datetime.datetime.now()
-
-    # Check if the password has expired
-    if current_time > expiration_time:
-        print("Password has expired. Exiting application.")
-        sys.exit()
-
-time.sleep(1)
-

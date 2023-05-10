@@ -30,7 +30,7 @@ def mouse_controlling(sock, event_queue, resize, cli_width, cli_height, disp_wid
         y = event_queue.get()
         x, y, inside_the_display = check_in_display(x, y, resize, cli_width, cli_height, disp_width, disp_height)
         if event_code == 0 or event_code == 7:
-            if inside_the_display:
+            if inside_the_display: 
                 if event_code == 7:
                     x = event_queue.get()
                     y = event_queue.get()
