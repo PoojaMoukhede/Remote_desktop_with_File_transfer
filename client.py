@@ -16,6 +16,15 @@ import connection_common
 import win32api
 from datetime import datetime
 import pygame
+import subprocess
+import time
+import ftplib
+import socket
+# from tkinter import *
+from tkinter import filedialog , StringVar
+from tkinter import ttk
+import os
+from tkinterdnd2 import *
 
 
 def send_event(sock,message):
@@ -97,10 +106,8 @@ def keyboard_controlling(key, event_code):
 def on_press(key):
     keyboard_controlling(key, "-1")  # -1 indicate a key press event
 
-
 def on_release(key):
     keyboard_controlling(key, "-2")   # -2 indicate a key release event.
-
 
 
 def receive_and_put_in_list(client_socket, jpeg_list):
@@ -144,7 +151,15 @@ def display_data(jpeg_list, status_list, disp_width, disp_height, resize):
         display_surface.blit(py_image, (0, 0))
         pygame.display.flip()
         clock.tick(60)
-
+        
+def capture_screen(queue,disp_width,disp_height):
+    while True:
+        frame = ImageGrab.grab()  # Capture the screen frame
+        frame = frame.resize((disp_width, disp_height))  # Resize the frame
+        image_bytes = BytesIO()
+        frame.save(image_bytes, format='PNG')  # Convert the frame to PNG format
+        compressed_bytes = lz4.frame.compress(image_bytes.getvalue())  # Compress the frame
+        queue.put(compressed_bytes)  # Put the compressed frame into the queue
 
 def cleanup_process():
     process_list = [process1, process2]
@@ -219,15 +234,19 @@ def remote_display():
     thread3 = Thread(target=cleanup_display_process, args=(execution_status_list,), daemon=True)
     thread3.start()
     
-   
-
+    screen_queue = Multiprocess_queue()
+    screen_capture_process = Process(target=capture_screen, args=(screen_queue,))
+    screen_capture_process.start()
+    
+    
+      
 def login_to_connect():
-    global command_server_socket, remote_server_socket, thread1, server_ip, \
-        server_port
+    global command_server_socket, remote_server_socket, thread1, server_ip, server_port,file_server_socket
 
     server_ip = name_entry.get()
     server_port = int(port_entry.get())
     server_password = password_entry.get()
+
     if len(server_password) == 6 and server_password.strip() != "":
         try:
             command_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -235,24 +254,29 @@ def login_to_connect():
             server_password = bytes(server_password, "utf-8")
             connection_common.send_data(command_server_socket, 2, server_password)  # send password
             connect_response = connection_common.data_recive(command_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
-
+            
+            
             if connect_response != "1":
                 print("Wrong Password Entered...!")
             else:
                 print("\n")
                 print("Connected to the remote desktop...!")
                 label_status.grid()
+                # connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("connect", "utf-8"))  # send connect message
                 thread1 = Thread(target=listen_for_commands, daemon=True)
                 thread1.start()
                 
-                disconnect_button.configure(state="normal")   # Enable
+                file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                file_server_socket.connect((server_ip, server_port))
+                print(f'file server socket start {file_server_socket}')
+
+                disconnect_button.configure(state="normal")  # Enable
                 access_button_frame.grid(row=7, column=0, padx=45, pady=20, columnspan=2, sticky=tk.W + tk.E)
-              
-                name_entry.configure(state="disabled")   
+
+                name_entry.configure(state="disabled")
                 port_entry.configure(state="disabled")
                 password_entry.configure(state="disabled")
                 connect_button.configure(state="disabled")
-
         except OSError as e:
             label_status.grid_remove()
             print(e.strerror)
@@ -261,11 +285,11 @@ def login_to_connect():
 
 
 def close_sockets():
-    service_socket_list = [command_server_socket, remote_server_socket]
+    service_socket_list = [command_server_socket, remote_server_socket,file_server_socket]
     for sock in service_socket_list:
         if sock:
             sock.close()
-    print("Both Sockets are closed now")
+    print("All Sockets are closed now")
 
 
 def disconnect(btn_caller):
@@ -284,14 +308,22 @@ def disconnect(btn_caller):
     disconnect_button.configure(state="disabled")
     label_status.grid_remove()
     access_button_frame.grid_forget()
-
+    
+    
+    # if connection_timestamp is not None and time.time() - connection_timestamp >=120 :  # 1800 seconds = 30 minutes
+    #     print("Connection time limit reached. Automatically disconnecting...")
+    # connection_timestamp = None 
+    
 def listen_for_commands():
+    # global connection_timestamp
     listen = True
     try:
         while listen:
             message = connection_common.data_recive(command_server_socket, HEADER_COMMAND_SIZE, bytes(), 1024)[0].decode("utf-8")
             if message == "disconnect":
                 listen = False
+            # elif message == "connect":
+            #  connection_timestamp = time.time()    
     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
         print(e.strerror)
     except ValueError:
@@ -301,12 +333,120 @@ def listen_for_commands():
         disconnect("message")
         print("Thread automatically exit")
 
+def select_file():
+    file_path = filedialog.askopenfilename(title="Select File")
+    file_entry.delete(0, tk.END)
+    file_entry.insert(tk.END, file_path)
+    file_status.config(text="File selected: " + file_path)
+
+# accepting one file at a time 
+def send_file():
+    global file_server_socket
+    # Get the server IP address
+    server_ip = name_entry.get()
+    
+    print(server_ip,'-----------')
+    
+    # Get the selected file path
+    file_path = file_entry.get()
+    port = 1234
+    file_size = os.stat(file_path).st_size
+    connection_common.send_data(file_server_socket, FILE_HEADER_SIZE, bytes(str(file_size), "utf-8"))
+    # Check if both the server IP address and file path are provided
+    if server_ip and file_path:
+        # Create a socket object
+        file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if file_path.endswith(('.exe', '.dll','.rar')):
+             response = messagebox.askquestion("File Sending Confirmation", "You are trying to send an EXE or DLL file. Are you sure you want to proceed?")
+             if response == 'no':
+                messagebox.showinfo("Thankyou", "File sending cancelled")
+                print('File sending cancelled:', file_path)
+                return 
+        
+        try:
+            # Connect to the server
+            file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            file_server_socket.connect((server_ip, port))
+            
+            # Send the file name
+            file_name = os.path.basename(file_path)
+            file_server_socket.send(file_name.encode())
+            
+            
+            
+            # Send the file data
+            with open(file_path, 'rb') as file:
+                data = file.read(1024)
+                while data:
+                    # s.send(data)
+                    data = file.read(1024)
+                    if data:
+                      connection_common.send_data(file_server_socket, FILE_HEADER_SIZE, data)
+                print(data )
+                print('\n')
+                print(type(data)) 
+                print('File successfully sent.')
+            
+        except ConnectionRefusedError:
+            print('Connection refused. Make sure the server is running and the port is open.')
+        
+        
+# for sending file
+def send_button_clicked():
+    send_button.config(state="disable")
+    send_file()
+    send_button.config(state="normal")
+
+# Get path of file in label and entry
+def get_path(event):
+    file_path_label.configure(text=event.data)
+    
+def check_window_closed():
+    window_open = True
+    while window_open:
+        if (file_window is not None) and file_window.winfo_exists():
+            time.sleep(3)
+            continue
+        else:
+            file_button.configure(state="normal")
+            window_open = False
+    
+# def d_file():
+def file_transfer_window(event):
+    global file_window
+    file_button.configure(state="disabled")
+
+    file_window = tk.Toplevel()
+    file_window.title("File Transfer")
+    file_window.resizable(False, False)
+    
+    send_button = tk.Button(file_window, text="Send", command=send_button_clicked)
+    send_button.configure(width=16,height=1,bg='royal blue',fg='white',font=('Arial',10,'bold'))
+    send_button.pack()
+    send_button.place(x=200,y=150)
+    file_status.configure(text=event.data)
+    
+
+    connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("start_file_explorer", "utf-8"))
+
+    select_file_process = Process(target=select_file,  name="select_file_process", daemon=True)
+    select_file_process.start()
+
+    send_file_process = Thread(target=send_file, name="send_file_process", daemon=True)
+    send_file_process.start()
+
+    check_window_status_thread = Thread(target=check_window_closed, name="check_window_status", daemon=True)
+    check_window_status_thread.start()
+
+   
 
 if __name__ == "__main__":
     
     freeze_support()
     command_server_socket = None
     remote_server_socket = None
+    file_server_socket = None
+    
     thread1 = None
     thread2 = None
     mouse_listner = None
@@ -317,6 +457,7 @@ if __name__ == "__main__":
     server_port = int()
     status_event_log = 1
     HEADER_COMMAND_SIZE = 2
+    FILE_HEADER_SIZE = 10
     button_code = {Button.left: (1, 4), Button.right: (2, 5), Button.middle: (3, 6)}
 
     root = tk.Tk()
@@ -329,6 +470,7 @@ if __name__ == "__main__":
     title_font = Font(size=13, family="Arial", weight="bold")
     title_font_normal = Font(size=12, family="Arial",weight="bold")
     font_normal = Font(size=12, family="Arial")
+    file_img = tk.PhotoImage(file="assets/cloud-storage.png")
     
    
 
@@ -338,6 +480,7 @@ if __name__ == "__main__":
     connection_frame = tk.LabelFrame(my_screen, padx=100, pady=5, bd=0)
     connection_frame.configure(bg='whitesmoke')
     connection_frame.grid(row=0, column=0, padx=40, pady=40, sticky=tk.N)
+    send_window = tk.LabelFrame(my_screen,padx=100, pady=5, bd=0)
 
     img= Image.open('./assets/background.png')
     resized_image= img.resize((700,400), Image.LANCZOS)
@@ -396,23 +539,73 @@ if __name__ == "__main__":
 
     # View Remote Box button
     remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, padx=2, pady=2, bd=0, command=remote_display)
-    remote_button.configure(font=font_normal,background='whitesmoke',fg='white')
+    remote_button.configure(font=font_normal,background='whitesmoke',fg='black')
     remote_button.grid(row=0, column=0, padx=30, pady=30, sticky=tk.NSEW)
+    
+      # File transfer button
+    file_button = tk.Button(access_button_frame, text="File Transfer", image=file_img,background='whitesmoke', compound=tk.TOP, padx=2, pady=2, bd=0, command=lambda: my_screen.select(1))
+    file_button.configure(font=font_normal)
+    file_button.grid(row=0, column=3,padx=30, pady=30, sticky=tk.NSEW)
     
     access_button_frame.columnconfigure(0, weight=1)
     access_button_frame.rowconfigure(0, weight=1)
-    
+
     # Status Label
     label_status = tk.Label(root, text="Connected", image=green, compound=tk.LEFT, relief=tk.SUNKEN, bd=0, anchor=tk.E,  padx=10)
     label_status.configure(font=font_normal,bg='whitesmoke',fg='brown')
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
     label_status.grid_remove()
 
+    send_window.configure(bg='whitesmoke')
+    send_window1 = tk.Label(send_window, image=new_image,background='white')
+    send_window1.place(x=-100, y=0)
+    icon = tk.PhotoImage(file='assets/send.png')
+
+   
+    server_label = tk.Label(send_window1, text="Server IP    :")
+    server_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown', padx=1, pady=1)
+    server_label.pack()
+    server_label.place(x=80,y=40)
+
+    server_entry = tk.Entry(send_window1,font=title_font_normal,width=30)
+    server_entry.grid(row=0, column=0, pady=5, columnspan=2, sticky=tk.N)
+    server_entry.pack(pady=5)
+    server_entry.place(x=200,y=40)
+
+    file_label = tk.Label(send_window1, text="File Name  :" )
+    file_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
+    file_label.pack()
+    file_label.place(x=80,y=80)
+
+    file_entry = tk.Entry(send_window1, width=30,font=title_font_normal)
+    file_entry.grid(row=0, column=1, pady=5, columnspan=2, sticky=tk.N)
+    file_entry.place(x=200,y=80)
+
+    file_status = tk.Label(send_window1, text="**For selecting a file please click on browse button", fg='gray')
+    file_status.configure(font=('arial',10),bg='whitesmoke')
+    file_status.pack()
+    file_status.place(x=80, y=125)
+
+    file_button = tk.Button(send_window1, text="Browse", padx=4, pady=1,fg='white',font=title_font_normal,bg='red4', command=select_file)
+    file_button.configure(width=15, height=1)
+    file_button.grid(row=0, column=0, sticky=tk.N, padx=5, pady=5)
+    file_button.pack(pady=5)
+    file_button.place(x=110,y=180)
+
+    send_button = tk.Button(send_window1, text="Send", padx=2, pady=1,fg='white',font=title_font_normal,bg='red4', command=send_button_clicked)
+    send_button.grid(row=0, column=1, sticky=tk.N, padx=5, pady=5)
+    send_button.pack()
+    send_button.configure(width=15, height=1)
+    send_button.place(x=290,y=180)
+   
+    # # Register drop target for filePathLabel
+    file_path_label = tk.Label(send_window1, text="Drag and drop here")
+
     # Create Tab style
     tab_style = ttk.Style()
     tab_style.configure('TNotebook.Tab',font=title_font)
     my_screen.add(connection_frame, text=" Connection ")
-
-    root.mainloop()
+    my_screen.add(send_window, text=" File ")
     
-    # FOR CHECKING - 192.168.1.167
+    my_screen.hide(1)
+    root.mainloop()

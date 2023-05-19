@@ -1,24 +1,28 @@
 import socket
 import mss
 import connection_common  # import file which has data recive and send function
-import os
 import ctypes 
 import string
 import random
-import re
 import lz4.frame
 from PIL import Image,  ImageGrab, ImageTk
 from io import BytesIO
 from threading import Thread
 from multiprocessing import Process, Queue, freeze_support
 from pynput.mouse import Button, Controller as Mouse_controller
-from pyngrok.conf import PyngrokConfig
 import tkinter as tk
 from tkinter.font import Font
 from tkinter import ttk
 from pynput.keyboard import Key, Controller as Keyboard_controller
 import random
-
+from tkinter import messagebox
+import mss
+import mss.tools
+import os
+import numpy as np
+from random import randint
+# import multiprocessing
+from tkinter import filedialog
 
 
 def find_button(btn_code, event_Code):
@@ -113,7 +117,7 @@ def screen_sending():
     disable_wallpaper = connection_common.data_recive(client_socket_remote, 2, bytes(), 1024)
     
     if disable_wallpaper[0].decode("utf-8") == "True":
-        print("")
+        print("wallpaper disable")
     print(f"Your Desktop is now controlled remotely ...!")
 
     cli_width, cli_height = ImageGrab.grab().size
@@ -134,11 +138,13 @@ def socket_listener_create(server_ip, server_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((server_ip, server_port))
     sock.listen(1)
+   
+    
     return sock
 
     
 def close_socket():
-    service_socket_list = [command_client_socket, client_socket_remote]
+    service_socket_list = [command_client_socket, client_socket_remote, file_client_socket]
     for sock in service_socket_list:
         if isinstance(sock, tuple):
             continue
@@ -157,22 +163,9 @@ def process_cleanup():
             process.join()
     print("Remote controlled capture stopped due to process cleanup.")
 
-# def generate_password():
-#     PASSWORD = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
-#     current_time = datetime.datetime.now()
-
-#     # Set the expiration time to 1 hour from now
-#     expiration_time = current_time + datetime.timedelta(minutes=1)
-#     if current_time == expiration_time:
-#       print("password expire")
-#       close_socket()
-#       process_cleanup()
-      
-#     return PASSWORD, expiration_time
-
 
 def start_listining(option_value):
-    global client_socket_remote, server_socket, PASSWORD, login_thread
+    global client_socket_remote, server_socket, PASSWORD, login_thread 
     # Disable buttons
     start_btn.configure(state=tk.DISABLED)
     radio_btn.configure(state=tk.DISABLED)
@@ -201,7 +194,8 @@ def start_listining(option_value):
         password_text.configure(font=normal_font, state='disabled')
         password_text.grid(row=3, column=1, sticky=tk.W, pady=2)
         stop_btn.grid(row=4, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
-
+    # elif option_value == 2:
+        # screen_sharing()
     server_socket = socket_listener_create(server_ip, SERVER_PORT)
     login_thread = Thread(target=login_to_connect, name="login_thread", args=(server_socket,), daemon=True)
     login_thread.start()
@@ -215,7 +209,6 @@ def stop_listining():
     global server_socket, client_socket_remote, url
     if IS_CLIENT_CONNECTED:
         connection_common.send_data(command_client_socket, HEADER_COMMAND_SIZE, bytes("disconnect", "utf-8"))
-        
     # Closing all the sockets
     if server_socket:
         server_socket.close()
@@ -228,6 +221,8 @@ def stop_listining():
         local_ip_text.grid_forget()
         local_ip_text.configure(state="normal")
         local_ip_text.delete('1.0', tk.END)
+
+        
     label_status.configure(font=normal_font, text="Not Connected", image=red)
    
     connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)  # Enable buttons
@@ -238,6 +233,7 @@ def stop_listining():
     # Disable button
     stop_btn.configure(state=tk.DISABLED)
     details_frame.grid_forget()
+    
     port_label.grid_forget()
     port_text.grid_forget()
     port_text.configure(state="normal")
@@ -246,10 +242,10 @@ def stop_listining():
     password_text.grid_forget()
     password_text.configure(state="normal")
     password_text.delete('1.0', tk.END)
+    
 
 def login_to_connect(sock):
-    global command_client_socket, client_socket_remote, thread1, \
-        IS_CLIENT_CONNECTED
+    global command_client_socket, client_socket_remote, thread1, file_client_socket,IS_CLIENT_CONNECTED , f_thread
     accept = True
     try:
         while accept:
@@ -258,25 +254,36 @@ def login_to_connect(sock):
             label_status.configure(font=normal_font, text="Start listening", image=yellow)
             command_client_socket, address = sock.accept()
             print(f"Recived login request from {address[0]}...")
+            
             received_password = connection_common.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
             if received_password == PASSWORD:
                 connection_common.send_data(command_client_socket, 2, bytes("1", "utf-8"))  
-    
+               
                 print("\n")
                 print(f"Connection from {address[0]} has been connected!")
                 label_status.configure(font=normal_font, text="Connected", image=green)
                 thread1 = Thread(target=listinging_commands, name="listinging_commands", daemon=True)   # thread for listening command
                 thread1.start()
+                
+                 # file transfer socket
+                file_client_socket, address = sock.accept()
+                print(f'File client socket listing on {address[0]}')
+                f_thread = Thread(target=save_file, name='save file',daemon=True)
+                f_thread.start()
+                
                 IS_CLIENT_CONNECTED = True
                 accept = False
+                
             else:
                 connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))  
                 print(f"{address[0]}...Please enter correct password")
                 command_client_socket.close()
                 print("command_client_socket.close()")
+             
+  
     except (ConnectionAbortedError, ConnectionResetError, OSError):
         label_status.configure(font=normal_font, text="Not Connected", image=red)
-
+        
 
 
 def listinging_commands():
@@ -298,6 +305,7 @@ def listinging_commands():
     except ValueError:
         pass
     finally:
+        
         IS_CLIENT_CONNECTED = False
         close_socket()
         process_cleanup()
@@ -305,14 +313,44 @@ def listinging_commands():
         login_thread.start()
         print("Thread1 automatically closed")
 
+
+def save_file():
+    # Receive the file name
+    file_name = file_client_socket.recv(1024).decode('utf-8', errors='ignore')
+    
+    # Check if the file has a restricted extension
+    if file_name.endswith(('.exe', '.dll','.rar')):
+        response = messagebox.askquestion("Download Confirmation", "Do you want to download the file?")
+        if response == 'no':
+            print('File download not allowed:', file_name)
+            return
+
+     # Set the destination folder to save the file
+    directory = os.path.join(os.getcwd(), 'Received')
+    os.makedirs(directory, exist_ok=True)
+    destination = os.path.join(directory, file_name)
+    print(f"file_name is {file_name}")
+    print(f'destination is {destination}')
+    
+    # Receive the file data and save it to the destination folder
+    with open(destination, 'wb') as file:
+        data = file_client_socket.recv(1024)
+        file.write(data)
+        print(type(data))
+    print('File successfully received:', file_name)
+
+
+
 if __name__ == "__main__":
     
     freeze_support()
     PATH = Desktop_bg_path()
     server_socket = None
     client_socket_remote = None
+    file_client_socket = None
     command_client_socket = None
     thread1 = None
+    f_thread = None
     login_thread = None
     process1 = None
     process2 = None
@@ -321,6 +359,7 @@ if __name__ == "__main__":
     url = str()
     SERVER_PORT = 1234
     HEADER_COMMAND_SIZE = 2
+    FILE_HEADER_SIZE = 10
     IS_CLIENT_CONNECTED = False
 
     root = tk.Tk()
@@ -335,38 +374,42 @@ if __name__ == "__main__":
     
     # trying to set background image to root  
     img= Image.open('./assets/background.png')
-    resized_image= img.resize((700,400), Image.ANTIALIAS)
+    resized_image= img.resize((700,400), Image.LANCZOS)
     new_image= ImageTk.PhotoImage(resized_image)
     label = tk.Label(listener_frame, image=new_image,background='white')
     label.place(x=0, y=0)
     
     #Images
-    yellow = tk.PhotoImage(file="assets/yellow_dot.png")
-    green = tk.PhotoImage(file="assets/green_dot.png")
-    red = tk.PhotoImage(file="assets/red_dot.png")
+    yellow = tk.PhotoImage(file="./assets/yellow_dot.png")
+    green = tk.PhotoImage(file="./assets/green_dot.png")
+    red = tk.PhotoImage(file="./assets/red_dot.png")
 
     label_note = tk.Label(listener_frame, anchor=tk.CENTER)
     label_note.grid(row=0, column=0, padx=200, pady=5, columnspan=2, sticky=tk.N)
     
-    heading_fort = Font(family="Arial", size=17, weight="bold")
+    heading_font = Font(family="Arial", size=17, weight="bold")
     title_font = Font(family="Arial", size=14, weight='normal')
     title_font_normal = Font(family="Arial", size=13, weight="bold")
     normal_font = Font(family="Arial", size=13)
 
-    heading = tk.Label(listener_frame, text="Remote Control Access",font=heading_fort ,bg='whitesmoke',fg='brown')  
+    heading = tk.Label(listener_frame, text="Remote Control Access",font=heading_font ,bg='whitesmoke',fg='brown')  
     heading.place(x=150,y=43)  
 
     # Connection Frame
     connection_frame = tk.LabelFrame(listener_frame, text="Connection Mode", padx=90, pady=30 ,fg='brown')
     connection_frame.configure(font=title_font,background='whitesmoke')
     connection_frame.grid(row=1, column=0, padx=120, pady=80, sticky=tk.W)
-
+    send_window = tk.LabelFrame(my_screen,padx=100, pady=5, bd=0)
+    send_window.configure(bg='#f4fdfe')
+    icon = tk.PhotoImage(file='assets/send.png')
+    
 
     radio_var = tk.IntVar()
     radio_var.set(1)
     radio_btn = tk.Radiobutton(connection_frame, text="IP", variable=radio_var, value=1)
     radio_btn.configure(font=normal_font,background='whitesmoke')
     radio_btn.grid(row=0, column=0, sticky=tk.W, padx=20, pady=5)
+    
     start_btn = tk.Button(connection_frame, text="Start Listining", padx=2, pady=1, command=lambda: start_listining(radio_var.get()))
     start_btn.configure(font=title_font_normal,bg='red4',fg='white')
     start_btn.grid(row=2, column=0, sticky=tk.W, pady=(20, 2), padx=(20, 2))
@@ -376,7 +419,7 @@ if __name__ == "__main__":
     details_frame.configure(font=title_font,background='whitesmoke')
     details_frame.grid(row=1, column=0, padx=40, pady=40)
     
-
+   
     # Local IP Design
     local_ip_label = tk.Label(details_frame, text="LOCAL IP       :", padx=5, pady=5 )
     local_ip_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
@@ -395,18 +438,18 @@ if __name__ == "__main__":
 
     stop_btn = tk.Button(details_frame, text="Stop Listining", padx=2, pady=1, command=lambda: stop_listining())
     stop_btn.configure(font=title_font_normal, state="disabled",bg='brown',fg='white')
-
-    # Details Frame Disable 
+    
     details_frame.grid_forget()
     
     label_status = tk.Label(root, text="Not Connected", image=red, compound=tk.LEFT, relief=tk.SUNKEN, anchor=tk.E, padx=10)
     label_status.configure(font=normal_font,background='whitesmoke',fg='brown')
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
-
+    
     # Create Tab 
     tab_style = ttk.Style()
     tab_style.configure('TNotebook.Tab', font=title_font_normal)
     my_screen.add(listener_frame, text=" Remote Access Connection ")
-
-    root.mainloop()
+    my_screen.add(send_window,text=" File ")
     
+    my_screen.hide(1)
+    root.mainloop()

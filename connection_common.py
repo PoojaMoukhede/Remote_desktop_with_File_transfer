@@ -4,7 +4,7 @@ def data_recive(socket, size_of_header, chunk_prev_message, buffer_size=65536):
     # print(socket,"--socket")
     prev_buffer_size = len(chunk_prev_message)
     headerMsg = bytes()
-
+    # print(f'headerMsg {headerMsg}')
     if prev_buffer_size < size_of_header:
             headerMsg = socket.recv(size_of_header - prev_buffer_size)
 
@@ -15,10 +15,20 @@ def data_recive(socket, size_of_header, chunk_prev_message, buffer_size=65536):
     elif prev_buffer_size >= size_of_header:
         headerMsg = chunk_prev_message[:size_of_header]
         chunk_prev_message = chunk_prev_message[size_of_header:]
-
-    msgSize = int(headerMsg.decode("utf-8"))
-    newMsg = chunk_prev_message
-    chunk_prev_message = bytes()
+    
+    # if msgSize == '':
+    #    msgSize = str(int(headerMsg.decode("utf-8"))) 
+    #    newMsg = chunk_prev_message
+    #    chunk_prev_message = bytes()
+    global msgSize,newMsg
+    try:   
+        msgSize = int(headerMsg.decode())
+        # print(f'msgSize {msgSize}')
+        newMsg = chunk_prev_message
+        # print(f'newMsg {newMsg}')
+        chunk_prev_message = bytes()
+    except (ValueError):
+        pass    
 
     if msgSize:
         while True:
