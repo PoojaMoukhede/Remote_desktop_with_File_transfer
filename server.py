@@ -77,7 +77,8 @@ def event_recived(sock,wallpaper_path):
     except (ConnectionAbortedError, OSError, ConnectionResetError) as e:
         print(e.strerror)
 
-def take_screenshot(screenshot_list, cli_width, cli_height):
+
+def take_screenshot(screenshot_list, cli_width, cli_height, border_width=5, border_color=(0, 255, 0)):
     sct = mss.mss()
     sct.compression_level = 6
     mon = {"top": 0, "left": 0, "width": cli_width, "height": cli_height}
@@ -85,11 +86,15 @@ def take_screenshot(screenshot_list, cli_width, cli_height):
     while capture:
         screenshot = sct.grab(mon)
         pil_image_obj = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
+        
+        # Add border to the image
+        bordered_image = Image.new('RGB', (cli_width + 2*border_width, cli_height + 2*border_width), border_color)
+        bordered_image.paste(pil_image_obj, (border_width, border_width))
+        
         buffer = BytesIO()
-        pil_image_obj.save(buffer, format='jpeg', quality=20)
+        bordered_image.save(buffer, format='jpeg', quality=20)
         screenshot_list.put(lz4.frame.compress(buffer.getvalue()))
         buffer.close()
-
 
 
 def take_from_list_and_send(screenshot_list, sock):
@@ -244,8 +249,52 @@ def stop_listining():
     password_text.delete('1.0', tk.END)
     
 
+# def login_to_connect(sock):
+#     global command_client_socket, client_socket_remote, thread1, file_client_socket,IS_CLIENT_CONNECTED , f_thread
+#     accept = True
+#     try:
+#         while accept:
+#             print("\n")
+#             print("Start listening for incoming connection")
+#             label_status.configure(font=normal_font, text="Start listening", image=yellow)
+#             command_client_socket, address = sock.accept()
+            
+#             print(f"Recived login request from {address[0]}...")
+            
+#             received_password = connection_common.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
+#             print(f'received_password : {received_password}')
+#             if received_password == PASSWORD:
+#                 connection_common.send_data(command_client_socket, 2, bytes("1", "utf-8"))  
+               
+#                 print("\n")
+#                 print(f"Connection from {address[0]} has been connected!")
+#                 label_status.configure(font=normal_font, text="Connected", image=green)
+#                 thread1 = Thread(target=listinging_commands, name="listinging_commands", daemon=True)   # thread for listening command
+#                 thread1.start()
+                
+#                  # file transfer socket
+#                 file_client_socket, address = sock.accept()
+#                 file_data=  connection_common.data_recive(file_client_socket, 10, bytes(), 1024)[0].decode("utf-8")
+#                 print(f'File client socket listing on {address[0]}')
+#                 print(f'file data : {file_data}')
+#                 f_thread = Thread(target=save_file, name='save file',daemon=True)
+#                 f_thread.start()
+                
+#                 IS_CLIENT_CONNECTED = True
+#                 accept = False
+                
+#             else:
+#                 connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))  
+#                 print(f"{address[0]}...Please enter correct password")
+#                 command_client_socket.close()
+#                 print("command_client_socket.close()")
+             
+  
+#     except (ConnectionAbortedError, ConnectionResetError, OSError):
+#         label_status.configure(font=normal_font, text="Not Connected", image=red)
+        
 def login_to_connect(sock):
-    global command_client_socket, client_socket_remote, thread1, file_client_socket,IS_CLIENT_CONNECTED , f_thread
+    global command_client_socket, client_socket_remote, thread1, file_client_socket, IS_CLIENT_CONNECTED, f_thread
     accept = True
     try:
         while accept:
@@ -253,37 +302,40 @@ def login_to_connect(sock):
             print("Start listening for incoming connection")
             label_status.configure(font=normal_font, text="Start listening", image=yellow)
             command_client_socket, address = sock.accept()
-            print(f"Recived login request from {address[0]}...")
-            
+
+            print(f"Received login request from {address[0]}...")
+
             received_password = connection_common.data_recive(command_client_socket, 2, bytes(), 1024)[0].decode("utf-8")
+            print(f'received_password : {received_password}')
             if received_password == PASSWORD:
-                connection_common.send_data(command_client_socket, 2, bytes("1", "utf-8"))  
-               
+                connection_common.send_data(command_client_socket, 2, bytes("1", "utf-8"))
                 print("\n")
                 print(f"Connection from {address[0]} has been connected!")
                 label_status.configure(font=normal_font, text="Connected", image=green)
-                thread1 = Thread(target=listinging_commands, name="listinging_commands", daemon=True)   # thread for listening command
+                thread1 = Thread(target=listinging_commands, name="listening_commands", daemon=True)   # thread for listening command
                 thread1.start()
-                
-                 # file transfer socket
-                file_client_socket, address = sock.accept()
-                print(f'File client socket listing on {address[0]}')
-                f_thread = Thread(target=save_file, name='save file',daemon=True)
+                file_client_socket, file_address = sock.accept()
+               
+
+                # file transfer socket
+                # file_data = connection_common.data_recive(file_client_socket, 10, bytes(), 1024)[0].decode("utf-8")
+                file_data = connection_common.data_recive(file_client_socket, 10, bytes(), 1024)[0].decode("utf-8")            
+                print(f'File client socket listening on {file_address[0]}')
+                print(f'file data: {file_data}')
+                f_thread = Thread(target=save_file, name='save_file', daemon=True)
                 f_thread.start()
-                
+
                 IS_CLIENT_CONNECTED = True
                 accept = False
-                
+
             else:
-                connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))  
+                connection_common.send_data(command_client_socket, 2, bytes("0", "utf-8"))
                 print(f"{address[0]}...Please enter correct password")
                 command_client_socket.close()
                 print("command_client_socket.close()")
-             
-  
+
     except (ConnectionAbortedError, ConnectionResetError, OSError):
         label_status.configure(font=normal_font, text="Not Connected", image=red)
-        
 
 
 def listinging_commands():
@@ -297,6 +349,8 @@ def listinging_commands():
                 screen_sending()
             elif msg == "stop_capture":
                 process_cleanup()
+            elif msg == 'screen_sharing':
+                screen_sending_client()    
             elif msg == "disconnect":
                 listen = False
                 print("Disconnect message received")
@@ -316,8 +370,14 @@ def listinging_commands():
 
 def save_file():
     # Receive the file name
-    file_name = file_client_socket.recv(1024).decode('utf-8', errors='ignore')
-    
+    file_name = connection_common.data_recive(file_client_socket,FILE_HEADER_SIZE,bytes(),1024)[0].decode("utf-8")  # receive file name  like = 300 
+    # file_name = os.path.basename(file_name)
+    # file_name = file_client_socket.recv(1024).decode()   # receive file name  like = 3  392
+    print(f'file name 2 :{file_name}') 
+
+    # Receive the file size
+    # file_size = int(file_client_socket.recv(1024).decode())  # receive file size
+    # print(f'size of file {file_size}')
     # Check if the file has a restricted extension
     if file_name.endswith(('.exe', '.dll','.rar')):
         response = messagebox.askquestion("Download Confirmation", "Do you want to download the file?")
@@ -336,8 +396,51 @@ def save_file():
     with open(destination, 'wb') as file:
         data = file_client_socket.recv(1024)
         file.write(data)
+        data = file_client_socket.recv(1024)
+        print(f'data : {data}')
         print(type(data))
+        
+    # file =  open(destination , 'wb')
+    # while True:
+    #     print('receiving ..... ')
+    #     data = file_client_socket.recv(1024)
+    #     print('data =',data)
+    #     if not data : break
+    #     file.write(data.decode())
+
+    # file.close()     
+        
     print('File successfully received:', file_name)
+    # with open(destination, 'wb') as file:
+    #     while True:
+    #         data = file_client_socket.recv(1024)
+    #         print("outside while loop file write data 1")  
+    #         # data = connection_common.data_recive(file_client_socket,FILE_HEADER_SIZE,bytes(),1024)[0].decode("utf-8")
+    #         if not data:
+    #             break
+    #         print("inside while loop file write ------- ")  
+    #         Binary = ' '.join(format(ord(i), 'b') for i in file) 
+    #         data = "".join(chr(int(s, 2)) for s in  Binary.split())
+    #         print(f'\nString after conversion back to data:\n{data}')
+    #         file.write(data)
+    #     print("outside while loop file write")    
+    #     print(destination)    
+    # print('File successfully received:', file_name)
+
+def screen_sending_client():
+    global process1, process2, process3, client_socket_remote
+    # remote display socket
+    client_socket_remote , address = server_socket.accept()
+    cli_width, cli_height = ImageGrab.grab().size
+    resolution_msg = bytes(str(cli_width) + "," + str(cli_height), "utf-8")
+    connection_common.send_data(client_socket_remote, 2, resolution_msg)
+
+    screenshot_sync_queue = Queue(1)
+    process1 = Process(target=take_screenshot, args=(screenshot_sync_queue, cli_width, cli_height), daemon=True)
+    process1.start()
+
+    process2 = Process(target=take_from_list_and_send, args=(screenshot_sync_queue, client_socket_remote), daemon=True)
+    process2.start()
 
 
 
@@ -444,6 +547,7 @@ if __name__ == "__main__":
     label_status = tk.Label(root, text="Not Connected", image=red, compound=tk.LEFT, relief=tk.SUNKEN, anchor=tk.E, padx=10)
     label_status.configure(font=normal_font,background='whitesmoke',fg='brown')
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
+    
     
     # Create Tab 
     tab_style = ttk.Style()

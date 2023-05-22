@@ -78,3 +78,18 @@ in upload send_data ---> file open ---> send_data(socket,size_of_header,data)
 #     return PASSWORD, expiration_time
 
      
+# Get path of file in label and entry
+# def get_path(event):
+#     file_path_label.configure(text=event.data)
+    
+# def check_window_closed():
+#     window_open = True
+#     while window_open:
+#         if (file_window is not None) and file_window.winfo_exists():
+#             time.sleep(2)
+#             continue
+#         else:
+#             file_button.configure(state="normal")
+#             window_open = False
+      # check_window_status_thread = Thread(target=check_window_closed, name="check_window_status", daemon=True)
+    # check_window_status_thread.start()
