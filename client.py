@@ -249,11 +249,12 @@ def remote_display():
     
       
 def login_to_connect():
-    global command_server_socket, remote_server_socket, thread1, server_ip, server_port,file_server_socket
+    global command_server_socket, remote_server_socket, thread1, server_ip, server_port,file_server_socket,f_thread
 
     server_ip = name_entry.get()
     server_port = int(port_entry.get())
     server_password = password_entry.get()
+    
 
     if len(server_password) == 6 and server_password.strip() != "":
         try:
@@ -274,12 +275,12 @@ def login_to_connect():
                 
                 file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 file_server_socket.connect((server_ip, server_port))
+
+                f_thread = Thread(target=send_file, name='send_file',daemon=True)
+                f_thread.start()
                 print(f'file server socket start {file_server_socket}')
                 print("\n")
                 print("Connected to the remote desktop...!")
-                
-               
-
                 
                 label_status.grid()
                 disconnect_button.configure(state="normal")  # Enable
@@ -353,22 +354,18 @@ def select_file():
 
 # accepting one file at a time 
 def send_file():
-    global file_server_socket
+    global file_server_socket, file_path
     # Get the server IP address
     server_ip = name_entry.get()
     
     print(server_ip,'-----------')
-    
     # Get the selected file path
     file_path = file_entry.get()
+    
     port = 1234
-    # file_size = os.stat(file_path).st_size
-    # connection_common.send_data(file_server_socket, FILE_HEADER_SIZE, bytes(str(file_size), "utf-8"))
-    # print(f'size of file {file_size}')
     # Check if both the server IP address and file path are provided
     if server_ip and file_path:
-        # Create a socket object
-        file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  
         if file_path.endswith(('.exe', '.dll','.rar')):
              response = messagebox.askquestion("File Sending Confirmation", "You are trying to send an EXE or DLL file. Are you sure you want to proceed?")
              if response == 'no':
@@ -377,31 +374,11 @@ def send_file():
                 return 
         
         try:
-            # Connect to the server
-            file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            file_server_socket.connect((server_ip, port))
-            
             # Send the file name
             file_name = os.path.basename(file_path).strip()
-            # file_server_socket.send(file_name)
-            # print(file_name)
-            connection_common.send_data(file_server_socket,FILE_HEADER_SIZE, bytes(str(file_name), "utf-8"))
-            print(file_name)
-            
-            
-            # Send the file data
-            # with open(file_path, 'rb') as file:
-                
-            #     data = file.read(1024)    # file.read(1024).decode('utf-8')
-            #     while data:
-            #         file_server_socket.send(data)
-            #         data = file.read(1024) # file.read(1024).decode('utf-8')
-            #         if data:
-            #         #   connection_common.send_data(file_server_socket, FILE_HEADER_SIZE, data)
-            #           print("inside while loop")
-            #           file_server_socket.send(data)
-            #           print(f" inside while loop data : {data}")
-            #           print(f" inside while loop data : {type(data)}") 
+            file_name_e = file_name.encode('utf-8')
+            file_server_socket.send(file_name_e)
+
             file = open(file_path,'rb')
             length = file.read(1024)
             while (length):
@@ -409,9 +386,8 @@ def send_file():
                 print("sent ", repr(length))
                 length = file.read(1024)
             file.close()
-                # print('\n')
-                # print(type(data)) 
             print('File successfully sent.',file_name)
+           
             
         except ConnectionRefusedError:
             print('Connection refused. Make sure the server is running and the port is open.')
@@ -653,9 +629,6 @@ if __name__ == "__main__":
     send_button.configure(width=15, height=1)
     send_button.place(x=290,y=180)
    
-    # # Register drop target for filePathLabel
-    # file_path_label = tk.Label(send_window1, text="Drag and drop here")
-
     # Create Tab style
     tab_style = ttk.Style()
     tab_style.configure('TNotebook.Tab',font=title_font)
