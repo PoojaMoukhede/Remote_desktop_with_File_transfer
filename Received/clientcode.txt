@@ -1,0 +1,32 @@
+import tkinter as tk
+import socket
+import threading
+import subprocess
+import os
+from PIL import Image
+from io import BytesIO
+
+import pyautogui
+
+class ClientGUI:
+   
+    def __init__(self, master):
+        self.master = master
+        master.title("Client")
+        
+        
+        self.screen_size = pyautogui.size()
+        # Create the IP address label and entry
+        self.ip_label = tk.Label(master, text="Server IP Address:")
+        self.ip_label.grid(row=0, column=0, padx=5, pady=5)
+        self.ip_value_entry = tk.Entry(master)
+        self.ip_value_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        # Create the port label and entry
+        self.port_label = tk.Label(master, text="Server Port:")
+        self.port_label.grid(row=1, column=0, padx=5, pady=5)
+        self.port_value_entry = tk.Entry(master)
+        self.port_value_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        # Create the password label and entry
+        self.password_label = tk.Label(master, text=

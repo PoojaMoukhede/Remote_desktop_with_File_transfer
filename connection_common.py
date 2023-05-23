@@ -16,10 +16,6 @@ def data_recive(socket, size_of_header, chunk_prev_message, buffer_size=65536):
         headerMsg = chunk_prev_message[:size_of_header]
         chunk_prev_message = chunk_prev_message[size_of_header:]
     
-    # if msgSize == '':
-    #    msgSize = str(int(headerMsg.decode("utf-8"))) 
-    #    newMsg = chunk_prev_message
-    #    chunk_prev_message = bytes()
     global msgSize,newMsg
     try:   
         msgSize = int(headerMsg.decode())

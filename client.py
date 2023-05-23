@@ -16,11 +16,6 @@ import connection_common
 import win32api
 from datetime import datetime
 import pygame
-import subprocess
-import time
-import ftplib
-import socket
-# from tkinter import *
 from tkinter import filedialog , StringVar
 from tkinter import ttk
 import os
@@ -29,8 +24,6 @@ from tkinterdnd2 import *
 
 def send_event(sock,message):
     connection_common.send_data(sock, 2, message)
-    # print(sock,'----sock')
-    # print(message,'----message')
 
 def mouse_controlling(sock, event_queue, resize, cli_width, cli_height, disp_width, disp_height):
     while True:
@@ -53,9 +46,7 @@ def mouse_controlling(sock, event_queue, resize, cli_width, cli_height, disp_wid
 
 def XY_scale(x, y, cli_width, cli_height, disp_width, disp_height):
     X_scale = cli_width / disp_width
-    # print("X_scale -----------",X_scale)
     Y_scale = cli_height / disp_height
-    # print("Y_scale -----------",Y_scale)
     x *= X_scale
     y *= Y_scale
     return round(x, 1), round(y, 1)
@@ -197,7 +188,6 @@ def remote_display():
     disable_choice = messagebox.askyesno("Remote Box", "Disable remote device wallpaper?(yes,Turn black)")
 
     remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)     # remote display sockets
-    # print(remote_server_socket,"----remote display socket")
     remote_server_socket.connect((server_ip, server_port))
     
     connection_common.send_data(remote_server_socket, HEADER_COMMAND_SIZE, bytes(str(disable_choice), "utf-8"))
@@ -206,7 +196,6 @@ def remote_display():
     resize_option = False
     client_resolution = connection_common.data_recive(remote_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
     print("Received client_resolution :", client_resolution)
-    # client_width, client_height = client_resolution.split(",")
     
     try:
      client_width, client_height = client_resolution.split(",")
@@ -249,8 +238,9 @@ def remote_display():
     
       
 def login_to_connect():
+    # global command_server_socket, remote_server_socket, thread1, server_ip, server_port
     global command_server_socket, remote_server_socket, thread1, server_ip, server_port,file_server_socket,f_thread
-
+    
     server_ip = name_entry.get()
     server_port = int(port_entry.get())
     server_password = password_entry.get()
@@ -261,28 +251,23 @@ def login_to_connect():
             command_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             command_server_socket.connect((server_ip, server_port))
             server_password = bytes(server_password, "utf-8")
+            
             connection_common.send_data(command_server_socket, 2, server_password)  # send password
             connect_response = connection_common.data_recive(command_server_socket, 2, bytes(), 1024)[0].decode("utf-8")
-            
+            print(connect_response,"connect_response")
             
             if connect_response != "1":
                 print("Wrong Password Entered...!")
             else:
-                
+                label_status.grid()
                 # connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("connect", "utf-8"))  # send connect message
                 thread1 = Thread(target=listen_for_commands, daemon=True)
                 thread1.start()
-                
-                file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                file_server_socket.connect((server_ip, server_port))
-
-                f_thread = Thread(target=send_file, name='send_file',daemon=True)
-                f_thread.start()
-                print(f'file server socket start {file_server_socket}')
+            
                 print("\n")
                 print("Connected to the remote desktop...!")
                 
-                label_status.grid()
+           
                 disconnect_button.configure(state="normal")  # Enable
                 access_button_frame.grid(row=7, column=0, padx=45, pady=20, columnspan=2, sticky=tk.W + tk.E)
 
@@ -290,6 +275,14 @@ def login_to_connect():
                 port_entry.configure(state="disabled")
                 password_entry.configure(state="disabled")
                 connect_button.configure(state="disabled")
+                
+                file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                file_server_socket.connect((server_ip, server_port))
+
+                f_thread = Thread(target=send_file, name='send_file',daemon=True)
+                f_thread.start()
+                print(f'file server socket start {file_server_socket}')
+                
         except OSError as e:
             label_status.grid_remove()
             print(e.strerror)
@@ -298,7 +291,9 @@ def login_to_connect():
 
 
 def close_sockets():
-    service_socket_list = [command_server_socket, remote_server_socket,file_server_socket]
+    # service_socket_list = [command_server_socket, remote_server_socket,file_server_socket]
+    service_socket_list = [command_server_socket, remote_server_socket]
+    
     for sock in service_socket_list:
         if sock:
             sock.close()
@@ -308,7 +303,6 @@ def close_sockets():
 def disconnect(btn_caller):
     if btn_caller == "button":
         connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("disconnect", "utf-8"))
-    
     close_sockets()
 
     # Enable
@@ -355,12 +349,9 @@ def select_file():
 # accepting one file at a time 
 def send_file():
     global file_server_socket, file_path
-    # Get the server IP address
-    server_ip = name_entry.get()
-    
-    print(server_ip,'-----------')
-    # Get the selected file path
-    file_path = file_entry.get()
+
+    server_ip = name_entry.get() # Get the server IP address
+    file_path = file_entry.get()  # Get the selected file path
     
     port = 1234
     # Check if both the server IP address and file path are provided
@@ -383,12 +374,11 @@ def send_file():
             length = file.read(1024)
             while (length):
                 file_server_socket.send(length)
-                print("sent ", repr(length))
+                # print("sent ", repr(length))
                 length = file.read(1024)
             file.close()
             print('File successfully sent.',file_name)
            
-            
         except ConnectionRefusedError:
             print('Connection refused. Make sure the server is running and the port is open.')
 
@@ -414,7 +404,6 @@ def file_transfer_window(event):
     send_button.place(x=200,y=150)
     file_status.configure(text=event.data)
     
-
     connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("start_file_explorer", "utf-8"))
 
     select_file_process = Process(target=select_file,  name="select_file_process", daemon=True)
@@ -429,7 +418,6 @@ def remote_display_screen():
     connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("screen_sharing", "utf-8"))
     print("Start message sent")
     remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)     # remote display sockets
-    # print(remote_server_socket,"----remote display socket")
     remote_server_socket.connect((server_ip, server_port))
     print("\n")
     print(f">>Now you can SHARE SCREEN to remote desktop")
@@ -447,12 +435,10 @@ def remote_display_screen():
         resize_option = True
 
     jpeg_sync_queue = Multiprocess_queue()  
-
     thread2 = Thread(target=receive_and_put_in_list, name="recv_stream", args=(remote_server_socket, jpeg_sync_queue), daemon=True)
     thread2.start()
     
     execution_status_list = Multiprocess_queue()
-    
     process2 = Process(target=display_data, args=(jpeg_sync_queue, execution_status_list, display_width, display_height , resize_option), daemon=True)
     process2.start()
     
@@ -462,7 +448,6 @@ def remote_display_screen():
     screen_queue = Multiprocess_queue()
     screen_capture_process = Process(target=capture_screen, args=(screen_queue,))
     screen_capture_process.start()
-    
     
 
 if __name__ == "__main__":
@@ -568,11 +553,10 @@ if __name__ == "__main__":
     remote_button.configure(font=font_normal,background='whitesmoke',fg='black')
     remote_button.grid(row=0, column=0, padx=30, pady=30, sticky=tk.NSEW)
     
-      # File transfer button
+    # File transfer button
     file_button = tk.Button(access_button_frame, text="File Transfer", image=file_img,background='whitesmoke', compound=tk.TOP, padx=2, pady=2, bd=0, command=lambda: my_screen.select(1))
     file_button.configure(font=font_normal)
     file_button.grid(row=0, column=3,padx=30, pady=30, sticky=tk.NSEW)
-    
     
     screen_btn = tk.Button(access_button_frame,text='screen shareing',image=screen_img,background='whitesmoke', compound=tk.TOP, padx=2, pady=2, bd=0,command=remote_display_screen)
     screen_btn.configure(font=font_normal)
@@ -592,7 +576,6 @@ if __name__ == "__main__":
     send_window1.place(x=-100, y=0)
     icon = tk.PhotoImage(file='assets/send.png')
 
-   
     server_label = tk.Label(send_window1, text="Server IP    :")
     server_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown', padx=1, pady=1)
     server_label.pack()

@@ -151,6 +151,7 @@ def socket_listener_create(server_ip, server_port):
     
 def close_socket():
     service_socket_list = [command_client_socket, client_socket_remote, file_client_socket]
+    # service_socket_list = [command_client_socket, client_socket_remote]
     for sock in service_socket_list:
         if isinstance(sock, tuple):
             continue
@@ -213,6 +214,8 @@ def start_listining(option_value):
 
 def stop_listining():
     global server_socket, client_socket_remote, url ,file_client_socket
+    # global server_socket, client_socket_remote, url
+    
     if IS_CLIENT_CONNECTED:
         connection_common.send_data(command_client_socket, HEADER_COMMAND_SIZE, bytes("disconnect", "utf-8"))
     # Closing all the sockets
@@ -251,7 +254,9 @@ def stop_listining():
     
   
 def login_to_connect(sock):
+    # global command_client_socket, client_socket_remote, thread1, IS_CLIENT_CONNECTED
     global command_client_socket, client_socket_remote, thread1, file_client_socket, IS_CLIENT_CONNECTED, f_thread
+    
     accept = True
     try:
         while accept:
@@ -274,8 +279,7 @@ def login_to_connect(sock):
 
                 # Create a separate socket for file transfer
                 file_client_socket, file_address = sock.accept()
-                print(f'File client socket listening on {file_address[0]}')
-                
+                # print(f'File client socket listening on {file_address[0]}')
                 # Process the file name and content as needed
                 f_thread = Thread(target=save_file, name='save_file',daemon=True)
                 f_thread.start()
@@ -299,11 +303,11 @@ def listinging_commands():
         while listen:
             msg = connection_common.data_recive(command_client_socket, HEADER_COMMAND_SIZE, bytes(), 1024)[0].decode("utf-8")
             print(f"Message received:{msg}")
-            if msg == "start_capture":
+            if msg == "start_capture" or msg == '        start':
                 screen_sending()
-            elif msg == "stop_capture":
+            elif msg == "stop_capture" or msg == '        stop':
                 process_cleanup()
-            elif msg == 'screen_sharing':
+            elif msg == 'screen_sharing' or msg == '        screen':
                 screen_sending_client()    
             elif msg == "disconnect":
                 listen = False
@@ -337,8 +341,8 @@ def save_file():
     directory = os.path.join(os.getcwd(), 'Received')
     os.makedirs(directory, exist_ok=True)
     destination = os.path.join(directory, file_name)
-    print(f"file_name is {file_name}")
-    print(f'destination is {destination}')
+    # print(f"file_name is {file_name}")
+    # print(f'destination is {destination}')
     
     # Receive the file data and save it to the destination folder
     with open(destination, 'wb') as file:
