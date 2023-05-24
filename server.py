@@ -19,17 +19,13 @@ from tkinter import messagebox
 import mss
 import mss.tools
 import os
-import numpy as np
-from random import randint
-# import multiprocessing
-from tkinter import filedialog
-import select
 
 
 def find_button(btn_code, event_Code):
     for key in btn_code.keys():
         if event_Code in key:
             return btn_code.get(key)
+     
         
 def simulate(mouse, keyboard, btn_code, key_map, event_Code, msg):
     if event_Code == -1:
@@ -116,6 +112,7 @@ def Desktop_bg_path():
     else:
         return None
     
+    
 def screen_sending():
     global process1, process2, process3, client_socket_remote
     # remote display socket
@@ -140,9 +137,10 @@ def screen_sending():
     process3 = Process(target=event_recived, args=(client_socket_remote, PATH))
     process3.start()
 
-def socket_listener_create(server_ip, server_port):
+
+def socket_listener_create(server_ip, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind((server_ip, server_port))
+    sock.bind((server_ip, 1234))
     sock.listen(1)
    
     
@@ -150,7 +148,7 @@ def socket_listener_create(server_ip, server_port):
 
     
 def close_socket():
-    service_socket_list = [command_client_socket, client_socket_remote, file_client_socket]
+    service_socket_list = [command_client_socket, client_socket_remote, file_client_socket, chat_client_socket]
     # service_socket_list = [command_client_socket, client_socket_remote]
     for sock in service_socket_list:
         if isinstance(sock, tuple):
@@ -189,11 +187,6 @@ def start_listining(option_value):
         local_ip_text.insert(1.0, "{:<15} (Works when on same wifi or network)".format(server_ip))
         local_ip_text.configure(font=normal_font, state='disabled')
         local_ip_text.grid(row=0, column=1, sticky=tk.W, pady=2)
-        # Port details
-        port_label.grid(row=2, column=0, sticky=tk.W, pady=2)
-        port_text.insert(1.0, "{:<15}".format(SERVER_PORT))
-        port_text.configure(font=normal_font, state='disabled')
-        port_text.grid(row=2, column=1, sticky=tk.W, pady=2)
 
         # Password Details
         password_label.grid(row=3, column=0, sticky=tk.W, pady=2)
@@ -203,7 +196,7 @@ def start_listining(option_value):
         stop_btn.grid(row=4, column=0, columnspan=2, sticky=tk.N, pady=(30, 2))
     # elif option_value == 2:
         # screen_sharing()
-    server_socket = socket_listener_create(server_ip, SERVER_PORT)
+    server_socket = socket_listener_create(server_ip, 1234)
     login_thread = Thread(target=login_to_connect, name="login_thread", args=(server_socket,), daemon=True)
     login_thread.start()
 
@@ -242,11 +235,8 @@ def stop_listining():
     # Disable button
     stop_btn.configure(state=tk.DISABLED)
     details_frame.grid_forget()
+    my_screen.hide(1)
     
-    port_label.grid_forget()
-    port_text.grid_forget()
-    port_text.configure(state="normal")
-    port_text.delete('1.0', tk.END)
     password_label.grid_forget()
     password_text.grid_forget()
     password_text.configure(state="normal")
@@ -255,7 +245,7 @@ def stop_listining():
   
 def login_to_connect(sock):
     # global command_client_socket, client_socket_remote, thread1, IS_CLIENT_CONNECTED
-    global command_client_socket, client_socket_remote, thread1, file_client_socket, IS_CLIENT_CONNECTED, f_thread
+    global command_client_socket, client_socket_remote, thread1, file_client_socket, IS_CLIENT_CONNECTED, f_thread,chat_client_socket
     
     accept = True
     try:
@@ -283,8 +273,18 @@ def login_to_connect(sock):
                 # Process the file name and content as needed
                 f_thread = Thread(target=save_file, name='save_file',daemon=True)
                 f_thread.start()
-
+                
+                # chat socket
+                chat_client_socket, address = sock.accept()
+                
                 IS_CLIENT_CONNECTED = True
+                 # thread for chat
+                recv_chat_msg_thread = Thread(target=receive_message, name="recv_chat_msg_thread", daemon=True)
+                recv_chat_msg_thread.start()
+                # enable button frame
+
+                my_screen.add(chat_frame, text=" Chat ")
+                
                 accept = False
 
             else:
@@ -295,6 +295,7 @@ def login_to_connect(sock):
 
     except (ConnectionAbortedError, ConnectionResetError, OSError):
         label_status.configure(font=normal_font, text="Not Connected", image=red)
+
 
 def listinging_commands():
     global login_thread, IS_CLIENT_CONNECTED
@@ -317,7 +318,7 @@ def listinging_commands():
     except ValueError:
         pass
     finally:
-        
+        my_screen.hide(1)
         IS_CLIENT_CONNECTED = False
         close_socket()
         process_cleanup()
@@ -350,6 +351,7 @@ def save_file():
         file.write(data)
     print('File successfully received:', file_name)
  
+ 
 def screen_sending_client():
     global process1, process2, process3, client_socket_remote
     # remote display socket
@@ -366,6 +368,34 @@ def screen_sending_client():
     process2.start()
 
 
+def add_chat_display(msg, name):
+    text_chat_tab.configure(state=tk.NORMAL)
+    text_chat_tab.insert(tk.END, "\n")
+    text_chat_tab.insert(tk.END, name + ": " + msg)
+    text_chat_tab.configure(state="disabled")
+
+
+def send_message(event):
+    try:
+        msg = input_text_widget.get()
+        if msg and msg.strip() != "":
+            input_text_widget.delete(0, "end")
+            connection_common.send_data(chat_client_socket, CHAT_HEADER_SIZE, bytes(msg, "utf-8"))
+            add_chat_display(msg, LOCAL_NAME)
+    except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
+        print(e.strerror)
+
+
+def receive_message():
+    try:
+        while True:
+            msg = connection_common.data_recive(chat_client_socket, CHAT_HEADER_SIZE, bytes())[0].decode("utf-8")
+            add_chat_display(msg, REMOTE_NAME)
+    except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
+        print(e.strerror)
+    except ValueError:
+        pass
+
 
 if __name__ == "__main__":
     
@@ -374,19 +404,27 @@ if __name__ == "__main__":
     server_socket = None
     client_socket_remote = None
     file_client_socket = None
+    chat_client_socket = None
     command_client_socket = None
+    
     thread1 = None
     f_thread = None
     login_thread = None
+    
     process1 = None
     process2 = None
     process3 = None
+    
     PASSWORD = str()
     url = str()
-    SERVER_PORT = 1234
+    port = 1234
+    
     HEADER_COMMAND_SIZE = 2
     FILE_HEADER_SIZE = 10
+    CHAT_HEADER_SIZE = 10
     IS_CLIENT_CONNECTED = False
+    LOCAL_NAME = "Me"
+    REMOTE_NAME = "Remote"
 
     root = tk.Tk()
     root.title("Remote Box")
@@ -451,12 +489,6 @@ if __name__ == "__main__":
     local_ip_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
     local_ip_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
     
-    
-    # Port Design
-    port_label = tk.Label(details_frame, text="PORT NO        :", padx=5, pady=5)
-    port_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
-    port_text = tk.Text(details_frame, background="white",width=47, height=1,pady=5)
-    
     # Password Design
     password_label = tk.Label(details_frame, text="PASSWORD    :", padx=5, pady=5)
     password_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
@@ -471,12 +503,40 @@ if __name__ == "__main__":
     label_status.configure(font=normal_font,background='whitesmoke',fg='brown')
     label_status.grid(row=3, column=0, columnspan=2, sticky=tk.W + tk.E)
     
+
+    chat_frame = tk.LabelFrame(my_screen, padx=20, pady=20, bd=0)
+    chat_frame.grid(row=0, column=0, sticky=tk.N)
+    
+    # Scroll bar to event frame
+    scroll_chat_widget = tk.Scrollbar(chat_frame)
+    scroll_chat_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
+
+    # Text Widget
+    text_chat_tab = tk.Text(chat_frame, width=50, height=20, font=("Helvetica", 14), padx=10, pady=10,  yscrollcommand=scroll_chat_widget.set)
+    text_chat_tab.configure(state='disabled')
+    text_chat_tab.grid(row=0, column=0, sticky=tk.N)
+
+    scroll_chat_widget.config(command=text_chat_tab.yview)
+
+    # Frame for input text
+    input_text_frame = tk.LabelFrame(chat_frame, pady=5, bd=0)
+    input_text_frame.grid(row=1, column=0, sticky=tk.W)
+
+    # Text Widget
+    input_text_widget = tk.Entry(input_text_frame, width=50)
+    input_text_widget.configure(font=("Helvetica", 14))
+    input_text_widget.bind("<Return>", send_message)
+    input_text_widget.grid(row=0, column=0, pady=10, sticky=tk.W)
+
     
     # Create Tab 
     tab_style = ttk.Style()
     tab_style.configure('TNotebook.Tab', font=title_font_normal)
+    
     my_screen.add(listener_frame, text=" Remote Access Connection ")
+    my_screen.add(chat_frame, text=" Chat ")
     my_screen.add(send_window,text=" File ")
     
     my_screen.hide(1)
+    my_screen.hide(2)
     root.mainloop()

@@ -24,7 +24,8 @@ from tkinterdnd2 import *
 
 def send_event(sock,message):
     connection_common.send_data(sock, 2, message)
-
+    
+    
 def mouse_controlling(sock, event_queue, resize, cli_width, cli_height, disp_width, disp_height):
     while True:
         event_code = event_queue.get()
@@ -62,6 +63,7 @@ def check_in_display(x, y, resize, cli_width, cli_height, disp_width, disp_heigh
             return x, y, True
     return x, y, False
 
+
 def on_move(x, y):
     mouse_event.put(0)  
     mouse_event.put(x)
@@ -78,12 +80,14 @@ def on_click(x, y, button, pressed):
         mouse_event.put(x)
         mouse_event.put(y)
 
+
 def on_scroll(x, y, dx, dy):
     mouse_event.put(7) 
     mouse_event.put(x)
     mouse_event.put(y)
     mouse_event.put(dx)
     mouse_event.put(dy)
+
 
 def keyboard_controlling(key, event_code):
     active_window = pygetwindow.getActiveWindow()
@@ -94,8 +98,10 @@ def keyboard_controlling(key, event_code):
             msg = bytes(event_code + key.name, "utf-8")
         send_event(remote_server_socket,msg)
 
+
 def on_press(key):
     keyboard_controlling(key, "-1")  # -1 indicate a key press event
+
 
 def on_release(key):
     keyboard_controlling(key, "-2")   # -2 indicate a key release event.
@@ -142,6 +148,7 @@ def display_data(jpeg_list, status_list, disp_width, disp_height, resize):
         display_surface.blit(py_image, (0, 0))
         pygame.display.flip()
         clock.tick(60)
+      
         
 def capture_screen(queue,disp_width,disp_height):
     while True:
@@ -188,7 +195,7 @@ def remote_display():
     disable_choice = messagebox.askyesno("Remote Box", "Disable remote device wallpaper?(yes,Turn black)")
 
     remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)     # remote display sockets
-    remote_server_socket.connect((server_ip, server_port))
+    remote_server_socket.connect((server_ip, 1234))
     
     connection_common.send_data(remote_server_socket, HEADER_COMMAND_SIZE, bytes(str(disable_choice), "utf-8"))
     print("\n")
@@ -235,21 +242,20 @@ def remote_display():
     screen_capture_process = Process(target=capture_screen, args=(screen_queue,))
     screen_capture_process.start()
     
-    
-      
+     
 def login_to_connect():
     # global command_server_socket, remote_server_socket, thread1, server_ip, server_port
-    global command_server_socket, remote_server_socket, thread1, server_ip, server_port,file_server_socket,f_thread
+    global command_server_socket, remote_server_socket, thread1, server_ip, file_server_socket, f_thread, chat_server_socket
     
     server_ip = name_entry.get()
-    server_port = int(port_entry.get())
+    # server_port = int(port_entry.get())
     server_password = password_entry.get()
     
 
     if len(server_password) == 6 and server_password.strip() != "":
         try:
             command_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            command_server_socket.connect((server_ip, server_port))
+            command_server_socket.connect((server_ip, 1234))
             server_password = bytes(server_password, "utf-8")
             
             connection_common.send_data(command_server_socket, 2, server_password)  # send password
@@ -266,22 +272,29 @@ def login_to_connect():
             
                 print("\n")
                 print("Connected to the remote desktop...!")
-                
-           
-                disconnect_button.configure(state="normal")  # Enable
-                access_button_frame.grid(row=7, column=0, padx=45, pady=20, columnspan=2, sticky=tk.W + tk.E)
 
                 name_entry.configure(state="disabled")
-                port_entry.configure(state="disabled")
+                # port_entry.configure(state="disabled")
                 password_entry.configure(state="disabled")
                 connect_button.configure(state="disabled")
                 
                 file_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                file_server_socket.connect((server_ip, server_port))
+                file_server_socket.connect((server_ip, 1234))
 
                 f_thread = Thread(target=send_file, name='send_file',daemon=True)
                 f_thread.start()
                 print(f'file server socket start {file_server_socket}')
+                
+                # chat socket
+                chat_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                chat_server_socket.connect((server_ip, 1234))
+                
+                # thread for chat
+                recv_chat_msg_thread = Thread(target=receive_message, name="recv_chat_msg_thread", daemon=True)
+                recv_chat_msg_thread.start()
+                my_screen.add(chat_frame, text=" Chat ") 
+                disconnect_button.configure(state="normal")  # Enable
+                access_button_frame.grid(row=7, column=0, padx=45, pady=20, columnspan=2, sticky=tk.W + tk.E)
                 
         except OSError as e:
             label_status.grid_remove()
@@ -292,7 +305,7 @@ def login_to_connect():
 
 def close_sockets():
     # service_socket_list = [command_server_socket, remote_server_socket,file_server_socket]
-    service_socket_list = [command_server_socket, remote_server_socket]
+    service_socket_list = [command_server_socket, remote_server_socket, chat_server_socket]
     
     for sock in service_socket_list:
         if sock:
@@ -307,7 +320,7 @@ def disconnect(btn_caller):
 
     # Enable
     name_entry.configure(state="normal")
-    port_entry.configure(state="normal")
+    # port_entry.configure(state="normal")
     password_entry.configure(state="normal")
     connect_button.configure(state="normal")
             
@@ -315,11 +328,13 @@ def disconnect(btn_caller):
     disconnect_button.configure(state="disabled")
     label_status.grid_remove()
     access_button_frame.grid_forget()
-    
+    my_screen.hide(1)
+    my_screen.hide(2)
     
     # if connection_timestamp is not None and time.time() - connection_timestamp >=120 :  # 1800 seconds = 30 minutes
     #     print("Connection time limit reached. Automatically disconnecting...")
     # connection_timestamp = None 
+    
     
 def listen_for_commands():
     # global connection_timestamp
@@ -339,6 +354,7 @@ def listen_for_commands():
         label_status.grid_remove()
         disconnect("message")
         print("Thread automatically exit")
+
 
 def select_file():
     file_path = filedialog.askopenfilename(title="Select File")
@@ -382,7 +398,6 @@ def send_file():
         except ConnectionRefusedError:
             print('Connection refused. Make sure the server is running and the port is open.')
 
-
 # for sending file
 def send_button_clicked():
     send_button.config(state="disable")
@@ -412,13 +427,14 @@ def file_transfer_window(event):
     send_file_process = Thread(target=send_file, name="send_file_process", daemon=True)
     send_file_process.start()
 
+
 def remote_display_screen():
     global thread2, process1, process2, remote_server_socket 
     print("Send start message")
     connection_common.send_data(command_server_socket, HEADER_COMMAND_SIZE, bytes("screen_sharing", "utf-8"))
     print("Start message sent")
     remote_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)     # remote display sockets
-    remote_server_socket.connect((server_ip, server_port))
+    remote_server_socket.connect((server_ip, 1234))
     print("\n")
     print(f">>Now you can SHARE SCREEN to remote desktop")
     resize_option = False
@@ -448,7 +464,36 @@ def remote_display_screen():
     screen_queue = Multiprocess_queue()
     screen_capture_process = Process(target=capture_screen, args=(screen_queue,))
     screen_capture_process.start()
-    
+
+
+def add_chat_display(msg, name):
+    text_chat_tab.configure(state=tk.NORMAL)
+    text_chat_tab.insert(tk.END, "\n")
+    text_chat_tab.insert(tk.END, name + ": " + msg)
+    text_chat_tab.configure(state="disabled")
+
+
+def send_message(event):
+    try:
+        msg = text_display.get()
+        if msg and msg.strip() != "":
+            text_display.delete(0, "end")
+            connection_common.send_data(chat_server_socket, CHAT_HEADER_SIZE, bytes(msg, "utf-8"))
+            add_chat_display(msg, LOCAL_NAME)
+    except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
+        print(e.strerror)
+
+
+def receive_message():
+    try:
+        while True:
+            msg = connection_common.data_recive(chat_server_socket, CHAT_HEADER_SIZE, bytes())[0].decode("utf-8")
+            add_chat_display(msg, REMOTE_NAME)
+    except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError, OSError) as e:
+        print(e.strerror)
+    except ValueError:
+        pass
+
 
 if __name__ == "__main__":
     
@@ -456,6 +501,7 @@ if __name__ == "__main__":
     command_server_socket = None
     remote_server_socket = None
     file_server_socket = None
+    chat_server_socket = None
     
     thread1 = None
     thread2 = None
@@ -465,15 +511,26 @@ if __name__ == "__main__":
     process1 = None
     process2 = None
     server_ip = str()
-    server_port = int()
+    # server_port = int()
     status_event_log = 1
     HEADER_COMMAND_SIZE = 10
     FILE_HEADER_SIZE = 2
+    CHAT_HEADER_SIZE = 10
+    LOCAL_NAME = "Me"
+    REMOTE_NAME = "Remote"
     button_code = {Button.left: (1, 4), Button.right: (2, 5), Button.middle: (3, 6)}
 
     root = tk.Tk()
+    # root.geometry('1900x1050')
     root.title("Remote Access Control")
     root.resizable(False, False)
+    #Get the current screen width and height
+    # screen_width = root.winfo_screenwidth()
+    # screen_height = root.winfo_screenheight()
+
+    # #Print the screen size
+    # print("Screen width:", screen_width)
+    # print("Screen height:", screen_height)
 
     # image & fonts
     green = tk.PhotoImage(file="assets/green_dot.png")
@@ -483,6 +540,8 @@ if __name__ == "__main__":
     font_normal = Font(size=12, family="Arial")
     file_img = tk.PhotoImage(file="assets/cloud-storage.png")
     screen_img = tk.PhotoImage(file='assets/computer-screen.png')
+    # chat_img = tk.PhotoImage(file='assets/message1.png')
+    chat_img = tk.PhotoImage(file='assets/conversation.png')
     
    
     # My Screen Notebook
@@ -514,12 +573,7 @@ if __name__ == "__main__":
     name_entry = tk.Entry(form_frame, width=20)
     name_entry.configure(font=font_normal ,background="white")
     name_entry.grid(row=1, column=0, pady=5, columnspan=2, sticky=tk.N)
-    port_label = tk.Label(form_frame, text="PORT", padx=1, pady=1)
-    port_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
-    port_label.grid(row=2, column=0, columnspan=2, pady=5, sticky=tk.W)
-    port_entry = tk.Entry(form_frame, width=20)
-    port_entry.configure(font=font_normal ,background="white")
-    port_entry.grid(row=3, column=0, pady=5, columnspan=2, sticky=tk.N)
+  
     password_label = tk.Label(form_frame, text="PASSWORD", padx=1, pady=1)
     password_label.configure(font=title_font_normal,bg='whitesmoke',fg='brown')
     password_label.grid(row=4, column=0, columnspan=2, pady=5, sticky=tk.W)
@@ -549,18 +603,23 @@ if __name__ == "__main__":
     access_button_frame.grid_forget()
 
     # View Remote Box button
-    remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, padx=2, pady=2, bd=0, command=remote_display)
+    remote_button = tk.Button(access_button_frame, text="Remote Box", image=remote_img, compound=tk.TOP, bd=0, command=remote_display)
     remote_button.configure(font=font_normal,background='whitesmoke',fg='black')
-    remote_button.grid(row=0, column=0, padx=30, pady=30, sticky=tk.NSEW)
+    remote_button.grid(row=0, column=0, padx=10,sticky=tk.NSEW)
     
     # File transfer button
-    file_button = tk.Button(access_button_frame, text="File Transfer", image=file_img,background='whitesmoke', compound=tk.TOP, padx=2, pady=2, bd=0, command=lambda: my_screen.select(1))
+    file_button = tk.Button(access_button_frame, text="File Transfer", image=file_img,background='whitesmoke', compound=tk.TOP, bd=0, command=lambda: my_screen.select(2))
     file_button.configure(font=font_normal)
-    file_button.grid(row=0, column=3,padx=30, pady=30, sticky=tk.NSEW)
+    file_button.grid(row=0, column=3,padx=10, sticky=tk.NSEW)
     
-    screen_btn = tk.Button(access_button_frame,text='screen shareing',image=screen_img,background='whitesmoke', compound=tk.TOP, padx=2, pady=2, bd=0,command=remote_display_screen)
+    screen_btn = tk.Button(access_button_frame,text='screen shareing',image=screen_img,background='whitesmoke', compound=tk.TOP, bd=0,command=remote_display_screen)
     screen_btn.configure(font=font_normal)
-    screen_btn.grid(row=0, column=2,padx=30, pady=30, sticky=tk.NSEW)
+    screen_btn.grid(row=0, column=2, padx=10, sticky=tk.NSEW)
+    
+    # Chat button
+    chat_button = tk.Button(access_button_frame, text="Chat", image=chat_img, background='whitesmoke', compound=tk.TOP, bd=0, command=lambda: my_screen.select(1))
+    chat_button.configure(font=font_normal)
+    chat_button.grid(row=0, column=4, sticky=tk.W, padx=10)
     
     access_button_frame.columnconfigure(0, weight=1)
     access_button_frame.rowconfigure(0, weight=1)
@@ -612,11 +671,39 @@ if __name__ == "__main__":
     send_button.configure(width=15, height=1)
     send_button.place(x=290,y=180)
    
+    chat_frame = tk.LabelFrame(my_screen, padx=20, pady=20, bd=0)
+    chat_frame.grid(row=0, column=0, sticky=tk.N)
+
+    # Scroll bar to event frame
+    scroll_chat_widget = tk.Scrollbar(chat_frame)
+    scroll_chat_widget.grid(row=0, column=1, sticky=tk.N + tk.S)
+
+    # Text Widget
+    text_chat_tab = tk.Text(chat_frame, width=60, height=22, font=("Helvetica", 14), padx=10, pady=10,yscrollcommand=scroll_chat_widget.set)
+    text_chat_tab.configure(state='disabled')
+    text_chat_tab.grid(row=0, column=0, sticky=tk.N)
+
+    scroll_chat_widget.config(command=text_chat_tab.yview)
+
+    # Frame for input text
+    input_text_frame = tk.LabelFrame(chat_frame, pady=5, bd=0)
+    input_text_frame.grid(row=1, column=0, sticky=tk.W)
+
+    # Text Widget
+    text_display = tk.Entry(input_text_frame, width=60)
+    text_display.configure(font=("Helvetica", 14))
+    text_display.bind("<Return>", send_message)
+    text_display.grid(row=0, column=0, pady=10, sticky=tk.W)
+   
+   
     # Create Tab style
     tab_style = ttk.Style()
     tab_style.configure('TNotebook.Tab',font=title_font)
     my_screen.add(connection_frame, text=" Connection ")
+    my_screen.add(chat_frame, text=" Chat ")
     my_screen.add(send_window, text=" File ")
     
+    
     my_screen.hide(1)
+    my_screen.hide(2)
     root.mainloop()
